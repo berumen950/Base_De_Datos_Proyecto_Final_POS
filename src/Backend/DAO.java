@@ -9,10 +9,13 @@ package Backend;
  * @author emimo
  */
 
+import java.sql.*;
+import org.postgresql.util.*;
+
 import java.util.*;
 public class DAO {
     private String dbURL;
-    private ArrayList<Table> tables = new ArrayList<>();
+    private Map<String,Table> tables = new HashMap<>();
     
     public DAO(String dbURL){
         this.dbURL=dbURL;
