@@ -5,7 +5,8 @@
 package Presentation_Layer;
 
 import Entities_Layer.Customer;
-import Data_Layer.DLCustomer;
+import Data_Layer.*;
+import Entities_Layer.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import javax.swing.JTable;
@@ -66,18 +67,53 @@ public class FrmInicio extends javax.swing.JFrame {
         });
 
         jButton2.setText("Staff");
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
 
         jButton3.setText("Sales_Outlet");
+        jButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton3ActionPerformed(evt);
+            }
+        });
 
         jButton4.setText("Sales_Transactions");
+        jButton4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton4ActionPerformed(evt);
+            }
+        });
 
         jButton5.setText("Ref_Payment_Method");
+        jButton5.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton5ActionPerformed(evt);
+            }
+        });
 
         jButton6.setText("Products");
+        jButton6.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton6ActionPerformed(evt);
+            }
+        });
 
         jButton7.setText("Products_in_Transaction");
+        jButton7.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton7ActionPerformed(evt);
+            }
+        });
 
         jButton8.setText("Payments");
+        jButton8.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton8ActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -214,6 +250,209 @@ public class FrmInicio extends javax.swing.JFrame {
 
     }//GEN-LAST:event_jButton1ActionPerformed
 
+    private void jButton8ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton8ActionPerformed
+
+		PaymentsTableModel();
+		
+		
+		
+		ArrayList<Payment> payments = DLPayment.getPayments();
+		System.out.println(payments);
+		for(Payment p : payments){
+			Object[] row = {
+				p.getPayment_id(),
+				p.getAmount(),
+				p.getPayment_date(),
+				p.getPayment_reference(),
+				p.getTransaction_id(),
+				p.getPayment_method_code()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+		
+		
+
+
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton8ActionPerformed
+
+    private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
+		
+		ProductsTableModel();
+		
+		ArrayList<Product> products = DLProduct.getProducts();
+		System.out.println(products);
+		for(Product p : products){
+			Object[] row = {
+				p.getProduct_id(),
+				p.getName(),
+				p.getDescription(),
+				p.getProduct_code(),
+				p.getStock(),
+				p.getWholesale_price(),
+				p.getRetail_price()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+		
+
+
+
+
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton6ActionPerformed
+
+    private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
+
+		
+		Products_In_Transaction_TableModel();
+		
+		ArrayList<Products_In_Transaction> products_In_Transactions = DLProducts_In_Transaction.getProducts_In_Transaction();
+		
+		for(Products_In_Transaction p : products_In_Transactions){
+			Object[] row = {
+				p.getTransaction_id(),
+				p.getProduct_id(),
+				p.getQuantity()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+
+
+
+
+
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton7ActionPerformed
+
+    private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
+
+		Ref_Payment_Methods_TableModel();
+		
+		ArrayList<Ref_Payment_Methods> ref_Payment_Methods = DLRef_Payment_Methods.getRef_Payment_Methods();
+		
+		for(Ref_Payment_Methods r : ref_Payment_Methods){
+			Object[] row = {
+				r.getPayment_method_code(),
+				r.getPayment_method_name(),
+				r.getPayment_method_description()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton5ActionPerformed
+
+    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+
+		Sales_Outlets_TableModel();
+		
+		
+ArrayList<Sales_Outlets> sales_Outlets_List = DLSales_Outlets.getSales_Outlets();
+		
+		for(Sales_Outlets s : sales_Outlets_List){
+			Object[] row = {
+				s.getSales_outlet_id(),
+				s.getName(),
+				s.getAddress(),
+				s.getPhone()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+
+
+
+
+
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
+
+		Sales_Transactions_TableModel();
+		
+		ArrayList<Sales_Transactions> sales_transactions_List = DLSales_Transactions.getSales_Transactions();
+		
+		for(Sales_Transactions s : sales_transactions_List){
+			Object[] row = {
+				s.getTransaction_id(),
+				s.getTransaction_datetime(),
+				s.getWholesale_price(),
+				s.getRetail_price(),
+				s.getCustomer_id(),
+				s.getStaff_id(),
+				s.getSales_outlet_id()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+
+
+
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton4ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+
+		Staff_TableModel();
+		
+		ArrayList<Staff> Staff_List = DLStaff.getStaff();
+		
+		for(Staff s : Staff_List){
+			Object[] row = {
+				s.getStaff_id(),
+				s.getFirst_name(),
+				s.getLast_name(),
+				s.getRole(),
+				s.getAge(),
+				s.getAddress(),
+				s.getPhone(),
+				s.getEmail()
+			};
+			
+			
+		tableModel.setRowCount(0);
+		tableModel.addRow(row);
+			
+		}
+
+		
+
+
+
+
+
+// TODO add your handling code here:
+    }//GEN-LAST:event_jButton2ActionPerformed
+
 	public void CustomersTableModel(){
 		String[] columns={
 			"ID",
@@ -230,9 +469,115 @@ public class FrmInicio extends javax.swing.JFrame {
 		
 	}
 	
+	public void PaymentsTableModel(){
+		String[] columns={
+			"id",
+			"amount",
+			"date",
+			"reference",
+			"transaction_id",
+			"payment_method_code"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
+	
+	public void ProductsTableModel(){
+		String[] columns={
+			"id",
+			"name",
+			"description",
+			"product_code",
+			"stock",
+			"wholesale_price",
+			"retail_price"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
+	
+	public void Products_In_Transaction_TableModel(){
+		String[] columns={
+			"transaction_id",
+			"product_id",
+			"quantity"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
 	
 	
+	public void Ref_Payment_Methods_TableModel(){
+		String[] columns={
+			"code",
+			"name",
+			"description"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
 	
+	public void Sales_Outlets_TableModel(){
+		String[] columns={
+			"id",
+			"name",
+			"address",
+			"phone"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
+	
+	public void Sales_Transactions_TableModel(){
+		String[] columns={
+			"id",
+			"datetime",
+			"wholesale_price",
+			"retail_price",
+			"customer_id",
+			"staff_id",
+			"sales_outlet_id"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
+	
+	
+	public void Staff_TableModel(){
+		String[] columns={
+			"id",
+			"first_name",
+			"last_name",
+			"role",
+			"age",
+			"address",
+			"phone",
+			"email"
+		};
+				
+		tableModel = new DefaultTableModel(columns,0);
+		
+		jTableMain.setModel(tableModel);
+		
+	}
 	
 	
 	
