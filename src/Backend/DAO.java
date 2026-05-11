@@ -89,7 +89,7 @@ public class DAO {
 
                             if (part.startsWith("FIXED:")) {
 
-                                String fixedPart = part.substring(6); // remove "FIXED:"
+                                String fixedPart = part.substring(6); 
 
                                 if (fixedPart.startsWith("TRUE")) {
                                     fixed = true;
