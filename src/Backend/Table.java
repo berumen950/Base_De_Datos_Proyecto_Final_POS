@@ -14,8 +14,9 @@ public class Table {
     private String name;
     private ArrayList<Col> columns = new ArrayList<>();
     
-    public Table(String name){
+    public Table(String name,ArrayList<Col> columns){
         this.name=name;
+        this.columns=columns;
     }
     
     public String getTableName(){
@@ -32,6 +33,9 @@ public class Table {
                 }
                 case "STATE" ->{
                     return this.columns.get(colNum).getState();
+                }
+                case "NullType" ->{
+                    return this.columns.get(colNum).getNull();
                 }
                 default ->{
                     return null;
