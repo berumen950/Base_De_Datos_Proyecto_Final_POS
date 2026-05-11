@@ -130,12 +130,31 @@ public class DAO {
         }
     }
     
-    public void IConsult(){
-        
+    public Table fetch(String name){
+        return tables.get(name);
     }
     
-    public void Rconsult(){
-        
+    public void consult(DefaultTableModel model,String name){
+        try{
+            query = con.prepareStatement("SELECT * FROM ?");
+            query.setString(1,name);
+            rs= query.executeQuery();
+            
+            while(rs.next()){
+                
+                ResultSetMetaData meta = rs.getMetaData();
+                int colCount = meta.getColumnCount();
+                Object[] row = new Object[colCount];
+
+                for (int i = 1; i <= colCount; i++) {
+                    row[i - 1] = rs.getObject(i);
+                }
+
+                model.addRow(row);
+            }
+        } catch (Exception e){
+            System.out.println("Error: " + e.getMessage());
+        }
     }
     
     public void create(){
@@ -147,7 +166,7 @@ public class DAO {
     public void update(){
         
     }
-    public void filter(){
+    public void actionSF(){
         
     }
 }
