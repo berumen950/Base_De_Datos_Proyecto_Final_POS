@@ -11,5 +11,6 @@ package Backend;
 public enum Tag {
     NUMERICAL,
     STRING,
-    TIME
+    DATETIME,
+    DATE
 }
