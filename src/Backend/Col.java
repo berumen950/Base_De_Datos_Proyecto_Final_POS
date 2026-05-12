@@ -17,8 +17,9 @@ public class Col {
     private boolean is_nullable;
     private String format;
     private boolean is_increment;
+    private boolean prKey;
     
-    public Col(String name,Tag type, boolean is_fixed,List<String> values ,boolean is_nullable, String format,boolean is_increment ){
+    public Col(String name,Tag type, boolean is_fixed,List<String> values ,boolean is_nullable, String format,boolean is_increment,boolean prKey){
         this.name=name;
         this.type=type;
         this.is_fixed=is_fixed;
@@ -31,6 +32,7 @@ public class Col {
         this.is_nullable=is_nullable;
         this.format=format;
         this.is_increment=is_increment;
+        this.prKey=prKey;
     }
     public String getName(){
         return this.name;
@@ -79,5 +81,11 @@ public class Col {
     }
     public boolean getIncrementState(){
         return this.is_increment;
+    }
+    public boolean getPrKey(){
+        return this.prKey;
+    }
+    public void setPrKey(boolean prKey){
+        this.prKey=prKey;
     }
 }

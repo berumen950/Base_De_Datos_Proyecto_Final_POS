@@ -13,9 +13,11 @@ import javax.swing.table.*;
 import javax.swing.*;
 import java.sql.*;
 import org.postgresql.util.*;
-import org.postgresql.PGConnection;
+import org.postgresql.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.function.*;
+import java.util.concurrent.*;
 
 import java.util.*;
 public class DAO {
@@ -26,6 +28,7 @@ public class DAO {
     private PreparedStatement query;
     private Statement st;
     private ResultSet rs;
+    private boolean listen;
     
     public DAO(String dbURL){
         this.dbURL=dbURL;
@@ -115,7 +118,8 @@ public class DAO {
 
                     }
                     Boolean autoIncrement = Boolean.parseBoolean(col.get("auto_increment").asText());
-                    colList.add(new Col(name,type,fixed,values,nullable,format,autoIncrement));
+                    Boolean prKey = Boolean.parseBoolean(col.get("primary_key").asText());
+                    colList.add(new Col(name,type,fixed,values,nullable,format,autoIncrement,prKey));
                 }
                 tables.put(tableName, new Table(tableName,colList));
             }
@@ -157,16 +161,105 @@ public class DAO {
         }
     }
     
-    public void create(){
+    public void create(String name,LinkedHashMap<String,Object> values) throws Exception{
+        StringBuilder cols = new StringBuilder();
+        StringBuilder vals = new StringBuilder();
+        int i = 1;
         
-    }
-    public void delete(){
+        for (String col : values.keySet()) {
+            cols.append(col).append(",");
+            vals.append("?,");
+        }
+        cols.deleteCharAt(cols.length() - 1);
+        vals.deleteCharAt(vals.length() - 1);
         
+        String sql = "INSERT INTO" + name + "(" + cols + ")" + " VALUES (" + vals + ")";
+        query = con.prepareStatement(sql);
+        for (Object value : values.values()) {
+            query.setObject(i, value);
+            i++;
+        }
+        query.executeUpdate();
     }
-    public void update(){
+    public void delete(String name,LinkedHashMap<String,Object>position) throws Exception{
+        StringBuilder sql = new StringBuilder("DELETE FROM " + name + " WHERE ");
+        int i=1;
+        for(String col: position.keySet()){
+            sql.append(col).append(" = ? AND ");
+        }
+        sql.delete(sql.length()-5, sql.length());
         
-    }
-    public void actionSF(){
+        query = con.prepareStatement(sql.toString());
         
+        for(Object id: position.values()){
+            query.setObject(i,id);
+            i++;
+        }
+        query.executeUpdate();
     }
+    public void update(String name,LinkedHashMap<String,Object> values, LinkedHashMap<String,Object> position)throws Exception{
+        StringBuilder cols = new StringBuilder();
+        StringBuilder idList = new StringBuilder();
+        int i=1;
+        for(String col:values.keySet()){
+            cols.append(col).append("=?,");
+        }
+        cols.deleteCharAt(cols.length()-1);
+        for(String id: position.keySet()){
+            idList.append(id).append("=? AND ");
+        }
+        idList.delete(idList.length()-5,idList.length());
+        String sql="UPDATE " + name + "SET " + cols + " WHERE " + idList;
+        query = con.prepareStatement(sql);
+        for(Object value: values.values()){
+            query.setObject(i,value);
+            i++;
+        }
+        for(Object id: position.values()){
+            query.setObject(i,id);
+            i++;
+        }
+        query.executeUpdate();
+    }
+    public void actionSF(String name,String sql) throws Exception{
+        query = con.prepareStatement(sql);
+        query.executeUpdate();
+    }
+    public void StartListening(Consumer<String> receiver){
+        if(this.listen){
+            return;
+        }
+        this.listen=true;
+        
+        Thread listenThread = new Thread(()->{
+                try{
+                    st = con.createStatement();
+                    st.execute("LISTEN low_stock_channel");
+                   
+                    while(listen){
+                        PGNotification[] notifications = pgcon.getNotifications();
+
+                        if(notifications != null){
+                            for(PGNotification n: notifications){
+                                receiver.accept(n.getParameter());
+                            }
+                        }
+                        Thread.sleep(1000);
+                    }
+                }
+                catch(InterruptedException | SQLException e){
+                    System.out.println("Error: " + e.getMessage());
+                }
+        });
+    }
+    
+    
+    public void stopListening(){
+        this.listen=false;
+    }
+    
+    
+    
+    
+    
 }

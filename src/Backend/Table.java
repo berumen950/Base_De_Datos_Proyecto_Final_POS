@@ -45,4 +45,7 @@ public class Table {
             return null;
         }
     }
+    public ArrayList<Col> getColList(){
+        return this.columns;
+    }
 }

@@ -166,40 +166,88 @@ RETURNS JSON
 LANGUAGE sql
 AS
 $$
+
 SELECT json_agg(
+
     json_build_object(
+
         'table', t.table_name,
         'columns',
         (
             SELECT json_agg(
+
                 json_build_object(
+
                     'name', c.column_name,
                     'type', c.data_type,
                     'nullable', c.is_nullable,
-                    'comment', pgd.description,
-					'auto_increment',
+                    'comment',
+                    pgd.description,
+                    'auto_increment',
                     CASE
                         WHEN c.column_default LIKE 'nextval(%'
                         THEN true
                         ELSE false
+                    END,
+                    'primary_key',
+                    CASE
+                        WHEN pk.column_name IS NOT NULL
+                        THEN true
+                        ELSE false
                     END
+
                 )
+
+                ORDER BY c.ordinal_position
+
             )
+
             FROM information_schema.columns c
+
             LEFT JOIN pg_catalog.pg_statio_all_tables st
                 ON st.relname = c.table_name
+
             LEFT JOIN pg_catalog.pg_description pgd
                 ON pgd.objoid = st.relid
                 AND pgd.objsubid = c.ordinal_position
+
+            LEFT JOIN (
+
+                SELECT
+                    kcu.table_name,
+                    kcu.column_name
+
+                FROM information_schema.table_constraints tc
+
+                JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+
+                WHERE tc.constraint_type = 'PRIMARY KEY'
+
+            ) pk
+
+                ON c.table_name = pk.table_name
+                AND c.column_name = pk.column_name
+
             WHERE c.table_name = t.table_name
+            AND c.table_schema = 'public'
+
         )
+
     )
+
 )
+
 FROM (
+
     SELECT DISTINCT table_name
+
     FROM information_schema.columns
+
     WHERE table_schema = 'public'
+
 ) t;
+
 $$;
 
 
@@ -295,9 +343,14 @@ AS
 $$
 BEGIN
 	IF NEW.stock <=10 THEN
-		RAISE NOTICE
-		'WARNING!: Low stock for product: % Stock: %',
-		NEW.name,NEW.stock;
+	
+		 PERFORM pg_notify(
+            'low_stock_channel',
+            'Low stock for product: ' ||
+            NEW.name ||
+            ' Stock: ' ||
+            NEW.stock
+        );
 
 	END IF;
 
