@@ -78,6 +78,8 @@ CREATE TABLE sales_transactions
     staff_id INT NOT NULL,
     sales_outlet_id INT NOT NULL,
 
+
+-- Falta cascade y delete action
     FOREIGN KEY (customer_id)
         REFERENCES customers(customer_id),
 

@@ -11,7 +11,7 @@ package Presentation_Layer;
 import java.util.*;
 public class SortAndFilter {
     private String name;
-    private ArrayList<String> filters = new ArrayList<>();
+    private ArrayList<String> arguments = new ArrayList<>();
     private String sorter;
     public SortAndFilter(String name){
         this.name=name;
@@ -19,8 +19,8 @@ public class SortAndFilter {
     public String getName(){
         return this.name;
     }
-    public ArrayList<String> getFilters(){
-        return this.filters;
+    public ArrayList<String> getArguments(){
+        return this.arguments;
     }
     public String getSorter(){
         return this.sorter;
@@ -28,8 +28,8 @@ public class SortAndFilter {
     public void setName(String name){
         this.name=name;
     }
-    public void setFilter(ArrayList<String> filters){
-        this.filters=filters;
+    public void setArguments(ArrayList<String> arguments){
+        this.arguments=arguments;
     }
     
 }

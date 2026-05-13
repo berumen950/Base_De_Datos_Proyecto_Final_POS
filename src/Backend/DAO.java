@@ -21,8 +21,8 @@ import java.util.concurrent.*;
 
 import java.util.*;
 public class DAO {
-    private String dbURL;
-    private Map<String,Table> tables = new HashMap<>();
+    private final String dbURL;
+    private final Map<String,Table> tables = new HashMap<>();
     private PGConnection pgcon;
     private Connection con;
     private PreparedStatement query;
@@ -40,7 +40,6 @@ public class DAO {
         Tag type=null;
         boolean fixed=false;
         List<String> values = new ArrayList<>();
-        ArrayList<Col> colList = new ArrayList<>();
         try{
             Class.forName("org.postgresql.Driver");
             con = DriverManager.getConnection(dbURL,"admin","admin123");
@@ -57,31 +56,40 @@ public class DAO {
             ObjectMapper mapper = new ObjectMapper();
 
             JsonNode root = mapper.readTree(json);
+            System.out.println(
+                mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root)
+            );
             
             for(JsonNode tableNode : root){
-                colList.clear();
+                ArrayList<Col> colList = new ArrayList<>();
                 tableName=tableNode.get("table").asText();
                 
                 JsonNode columns = tableNode.get("columns");
                 
                 for(JsonNode col : columns){
                     String name = col.get("name").asText();
-                    String typeText = col.get("Type").asText();
+                    String typeText = col.get("type").asText();
                     if(typeText.equals("INT") || typeText.equals("SERIAL") || typeText.equals("NUMERIC(10,2)")){
                         type=Tag.NUMERICAL;
                     }
-                    if(typeText.equals("TEXT") || typeText.equals("VARCHAR")){
+                    else if(typeText.equals("TEXT") || typeText.equals("VARCHAR")){
                         type=Tag.STRING;
                     }
-                    if(typeText.equals("DATE")){
+                    else if(typeText.equals("DATE")){
                         type=Tag.DATE;
                     }
-                    if(typeText.equals("TIMESTAMP")){
+                    else if(typeText.equals("TIMESTAMP")){
                         type=Tag.DATETIME;
+                    }
+                    else if(typeText.equals("BOOLEAN")){
+                        type=Tag.BOOLEAN;
+                    }
+                    else{
+                        type = Tag.DEFAULT;
                     }
                     Boolean nullable = Boolean.parseBoolean(col.get("nullable").asText());
                     String data = col.path("comment").isNull() ? null : col.path("comment").asText();
-                    if(data.isBlank()){
+                    if(data == null || data.isBlank()){
                         fixed=false;
                         format="NONE";
                     }
@@ -130,7 +138,8 @@ public class DAO {
             
         }
         catch(Exception e){
-            System.out.println("Error: " + e.getMessage());
+            System.out.println("DAO start error");
+            e.printStackTrace();
         }
     }
     
@@ -140,8 +149,7 @@ public class DAO {
     
     public void consult(DefaultTableModel model,String name){
         try{
-            query = con.prepareStatement("SELECT * FROM ?");
-            query.setString(1,name);
+            query = con.prepareStatement("SELECT * FROM " + name);
             rs= query.executeQuery();
             
             while(rs.next()){
@@ -157,6 +165,7 @@ public class DAO {
                 model.addRow(row);
             }
         } catch (Exception e){
+            System.out.println("Error at consult");
             System.out.println("Error: " + e.getMessage());
         }
     }

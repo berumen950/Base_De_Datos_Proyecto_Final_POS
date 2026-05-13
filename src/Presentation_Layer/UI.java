@@ -9,6 +9,7 @@ package Presentation_Layer;
  * @author emimo
  */
 
+import Backend.Tag;
 import java.awt.*;
 import java.util.function.*;
 import java.util.concurrent.*;
@@ -20,16 +21,70 @@ import org.postgresql.util.*;
 import org.postgresql.*;
 import javax.swing.event.*;
 import java.awt.event.*;
+import javax.swing.border.Border;
 import javax.swing.text.MaskFormatter;
 public class UI extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(UI.class.getName());
     private String selected_table;
-    private Backend.DAO access = new Backend.DAO("postgresql://admin:admin123@localhost:5432/ProjectDB");
+    private Backend.DAO access = new Backend.DAO("jdbc:postgresql://localhost:5432/ProjectDB");
     private Backend.Table tableObj;
-    private DefaultTableModel model;
+    private DefaultTableModel model = new DefaultTableModel(){
+        @Override
+        public Class<?> getColumnClass(int columnIndex){
+            Backend.Tag colType = (Backend.Tag) tableObj.getColData(columnIndex, "TYPE");
+            switch(colType){
+                case Backend.Tag.NUMERICAL ->{
+                    return Double.class;
+                }
+                case Backend.Tag.STRING -> {
+                    return String.class;
+                }
+                case Backend.Tag.DATE->{
+                    return java.sql.Date.class;
+                }
+                case Backend.Tag.DATETIME -> {
+                    return java.sql.Timestamp.class;
+                }
+                case Backend.Tag.BOOLEAN -> {
+                    return Boolean.class;
+                }
+                case Backend.Tag.DEFAULT ->{
+                    return Object.class;
+                }
+                default ->{
+                    return Object.class;
+                }
+            }
+        }
+    };
+    private class CustomRenderer extends DefaultTableCellRenderer{
+        
+        private final Border customBorder = BorderFactory.createLineBorder(Color.getHSBColor(0.13f, 0.75f, 0.95f));
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int col){
+            super.getTableCellRendererComponent(table,value,isSelected,hasFocus,row,col);
+            
+            if((boolean)tableObj.getColData(col, "PRIMARY")){
+                setForeground(Color.white);
+                setBackground(Color.getHSBColor(TOP_ALIGNMENT, TOP_ALIGNMENT, TOP_ALIGNMENT));
+                setBorder(customBorder);
+            }
+            else{
+                setForeground(table.getForeground());
+                setBackground(table.getBackground());
+                setBorder(UIManager.getBorder("Table.cellNoFocusBorder"));
+            }
+            
+            
+            return this;
+        }
+    }
+    private CustomRenderer renderer = new CustomRenderer();
     private Map<String,JComponent> fields = new HashMap<>();
     private Map<String,Object> rowData = new HashMap<>();
+    private boolean loaded=false;
+    private boolean table_inUse=false;
     
     /**
      * Creates new form UI
@@ -38,6 +93,8 @@ public class UI extends javax.swing.JFrame {
         initComponents();
         model = (DefaultTableModel) Table.getModel();
         this.inputPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        access.start(tableSelect);
+        loaded=true;
     }
     
     public abstract class SimpleDocListener implements DocumentListener{
@@ -59,24 +116,37 @@ public class UI extends javax.swing.JFrame {
         }
     }
     
+    public  void rendererIntegrator(JTable table, DefaultTableModel model,String columnName,TableCellRenderer renderer,JTableHeader header){
+        model.addColumn(columnName);
+        TableColumn col = table.getColumnModel().getColumn(table.getColumnCount() - 1);
+        col.setCellRenderer(renderer);
+        header.setDefaultRenderer(renderer);
+    }
     
     
-    
-    public void loadTable(DefaultTableModel model){
-        this.tableSelect.getSelectedItem().toString();
+    public void loadTable(){
+        try{
+        this.selected_table=this.tableSelect.getSelectedItem().toString();
         tableObj = access.fetch(selected_table);
         model.setRowCount(0);
         model.setColumnCount(0);
-        this.colSelect.removeAll();
-        this.colSFSelector.removeAll();
-        this.colSortSelector.removeAll();
+        this.inputPanel.removeAll();
+        this.colSelect.removeAllItems();
+        this.colSFSelector.removeAllItems();
+        this.colSortSelector.removeAllItems();
         for(Backend.Col c: tableObj.getColList()){
             this.colSelect.addItem(c.getName());
             this.colSFSelector.addItem(c.getName());
             this.colSortSelector.addItem(c.getName());
-            JPanel cell = new JPanel();
-            cell.setLayout(new BoxLayout(cell,BoxLayout.Y_AXIS));
+            if(c.getPrKey()){
+                this.rendererIntegrator(Table, model, c.getName(), renderer,Table.getTableHeader());
+            }
+            else{
+                model.addColumn(c.getName());
+            }
             if(!c.getIncrementState()){
+                JPanel cell = new JPanel();
+                cell.setLayout(new BoxLayout(cell,BoxLayout.Y_AXIS));
                 cell.add(new JLabel(c.getName()));
                 if(c.getState()){
                     JComboBox<String> box = new JComboBox<>(c.getValues().toArray(String[]::new));
@@ -149,13 +219,57 @@ public class UI extends javax.swing.JFrame {
                             }
                         }
                         case "EMAIL" -> {
-                            
+                            JTextField input = new JTextField();
+                            input.getDocument().addDocumentListener(new SimpleDocListener(){
+                                    @Override
+                                    public void update(){
+                                        rowData.put(c.getName(),input.getText());
+                                    }
+                                });
+                            fields.put(c.getName(), input);
+                            cell.add(input);
+                        }
+                        case "BOOLEAN" -> {
+                            JCheckBox check = new JCheckBox();
+                            check.addActionListener(e ->{
+                                rowData.put(c.getName(),check.isSelected());
+                            });
+                            fields.put(c.getName(), check);
+                            cell.add(check);
+                        }
+                        default ->{
+                            JOptionPane.showMessageDialog(this, "Warning, unknown format error for: {" + c.getName() + "}" + ", using JTextFiled as default.");
+                            JTextField input = new JTextField();
+                            input.getDocument().addDocumentListener(new SimpleDocListener(){
+                                    @Override
+                                    public void update(){
+                                        rowData.put(c.getName(),input.getText());
+                                    }
+                                });
+                            fields.put(c.getName(), input);
+                            cell.add(input);
                         }
                             
                     }
                 }
+                inputPanel.add(cell);
             }
+            
+            access.consult(model, selected_table);
+            this.table_inUse=true;
         }
+        
+    } catch (Exception e){
+        System.out.println("LoadTable error");
+        JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        e.printStackTrace();
+    }
+    }
+    
+    
+    
+    
+    public void retrieveOP(){
         
     }
     
@@ -173,7 +287,7 @@ public class UI extends javax.swing.JFrame {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        jDialog1 = new javax.swing.JDialog();
+        SFWindow = new javax.swing.JDialog();
         jPanel7 = new javax.swing.JPanel();
         jPanel8 = new javax.swing.JPanel();
         colSFSelector = new javax.swing.JComboBox<>();
@@ -194,6 +308,9 @@ public class UI extends javax.swing.JFrame {
         sfDelete = new javax.swing.JButton();
         jScrollPane2 = new javax.swing.JScrollPane();
         jTable1 = new javax.swing.JTable();
+        jPanel10 = new javax.swing.JPanel();
+        sortLabel = new javax.swing.JLabel();
+        sortShowcasetxt = new javax.swing.JTextField();
         jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel1 = new javax.swing.JPanel();
         inputPanel = new javax.swing.JPanel();
@@ -360,25 +477,57 @@ public class UI extends javax.swing.JFrame {
         });
         jScrollPane2.setViewportView(jTable1);
 
-        javax.swing.GroupLayout jDialog1Layout = new javax.swing.GroupLayout(jDialog1.getContentPane());
-        jDialog1.getContentPane().setLayout(jDialog1Layout);
-        jDialog1Layout.setHorizontalGroup(
-            jDialog1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jDialog1Layout.createSequentialGroup()
+        jPanel10.setBackground(new java.awt.Color(0, 153, 204));
+
+        sortLabel.setText("Sorter");
+
+        sortShowcasetxt.setEditable(false);
+
+        javax.swing.GroupLayout jPanel10Layout = new javax.swing.GroupLayout(jPanel10);
+        jPanel10.setLayout(jPanel10Layout);
+        jPanel10Layout.setHorizontalGroup(
+            jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel10Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(jDialog1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jScrollPane2)
-                    .addComponent(jPanel7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGroup(jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(sortLabel)
+                    .addComponent(sortShowcasetxt, javax.swing.GroupLayout.PREFERRED_SIZE, 380, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+        jPanel10Layout.setVerticalGroup(
+            jPanel10Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel10Layout.createSequentialGroup()
+                .addComponent(sortLabel)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(sortShowcasetxt, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
-        jDialog1Layout.setVerticalGroup(
-            jDialog1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jDialog1Layout.createSequentialGroup()
+
+        javax.swing.GroupLayout SFWindowLayout = new javax.swing.GroupLayout(SFWindow.getContentPane());
+        SFWindow.getContentPane().setLayout(SFWindowLayout);
+        SFWindowLayout.setHorizontalGroup(
+            SFWindowLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(SFWindowLayout.createSequentialGroup()
+                .addGroup(SFWindowLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, SFWindowLayout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jPanel7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(jScrollPane2, javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(SFWindowLayout.createSequentialGroup()
+                        .addGap(6, 6, 6)
+                        .addComponent(jPanel10, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                .addContainerGap())
+        );
+        SFWindowLayout.setVerticalGroup(
+            SFWindowLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(SFWindowLayout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 364, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 330, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jPanel10, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
         );
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -407,6 +556,7 @@ public class UI extends javax.swing.JFrame {
         deleteBtn.setText("Delete");
 
         sfMenuBtn.setText("S&F");
+        sfMenuBtn.addActionListener(this::sfMenuBtnActionPerformed);
 
         javax.swing.GroupLayout btnPanelLayout = new javax.swing.GroupLayout(btnPanel);
         btnPanel.setLayout(btnPanelLayout);
@@ -620,15 +770,23 @@ public class UI extends javax.swing.JFrame {
 
         Table.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null}
+                {null},
+                {null},
+                {null},
+                {null}
             },
             new String [] {
-                "Title 1", "Title 2", "Title 3", "Title 4"
+                "Empty"
             }
-        ));
+        ) {
+            boolean[] canEdit = new boolean [] {
+                false
+            };
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
+            }
+        });
         jScrollPane1.setViewportView(Table);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -656,12 +814,22 @@ public class UI extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void tableSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tableSelectActionPerformed
-        // TODO add your handling code here:
+        if(loaded){
+            loadTable();
+        }
     }//GEN-LAST:event_tableSelectActionPerformed
 
     private void addValueBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addValueBtnActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_addValueBtnActionPerformed
+
+    private void sfMenuBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sfMenuBtnActionPerformed
+        if(loaded && table_inUse){
+            SFWindow.pack();
+            SFWindow.setLocationRelativeTo(this);
+            SFWindow.setVisible(true);
+        }
+    }//GEN-LAST:event_sfMenuBtnActionPerformed
 
     /**
      * @param args the command line arguments
@@ -689,6 +857,7 @@ public class UI extends javax.swing.JFrame {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JDialog SFWindow;
     private javax.swing.JTable Table;
     private javax.swing.JButton addValueBtn;
     private javax.swing.JPanel btnPanel;
@@ -706,9 +875,9 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JTextField filterBar;
     private javax.swing.JButton func1Btn;
     private javax.swing.JPanel inputPanel;
-    private javax.swing.JDialog jDialog1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel10;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
@@ -732,7 +901,9 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JButton sfDelete;
     private javax.swing.JButton sfMenuBtn;
     private javax.swing.JComboBox<String> sfObjSelector;
+    private javax.swing.JLabel sortLabel;
     private javax.swing.JComboBox<String> sortOperatorSelect;
+    private javax.swing.JTextField sortShowcasetxt;
     private javax.swing.JPanel tableOpPanel;
     private javax.swing.JComboBox<String> tableSelect;
     private javax.swing.JButton updateBtn;

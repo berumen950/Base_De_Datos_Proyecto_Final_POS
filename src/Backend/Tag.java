@@ -12,5 +12,7 @@ public enum Tag {
     NUMERICAL,
     STRING,
     DATETIME,
-    DATE
+    DATE,
+    BOOLEAN,
+    DEFAULT
 }

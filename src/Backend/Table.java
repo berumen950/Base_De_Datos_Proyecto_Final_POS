@@ -37,6 +37,9 @@ public class Table {
                 case "NullType" ->{
                     return this.columns.get(colNum).getNull();
                 }
+                case "PRIMARY" ->{
+                    return this.columns.get(colNum).getPrKey();
+                }
                 default ->{
                     return null;
                 }
