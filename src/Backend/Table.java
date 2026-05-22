@@ -5,16 +5,18 @@
 package Backend;
 
 import java.util.*;
+import Data.*;
 
 /**
  *
  * @author emimo
  */
+import Data.IndexMap;
 public class Table {
     private String name;
-    private ArrayList<Col> columns = new ArrayList<>();
+    private IndexMap<String,Col> columns = new IndexMap<>();
     
-    public Table(String name,ArrayList<Col> columns){
+    public Table(String name,IndexMap<String,Col> columns){
         this.name=name;
         this.columns=columns;
     }
@@ -22,23 +24,23 @@ public class Table {
     public String getTableName(){
         return this.name;
     }
-    public Object getColData(int colNum,String data){
+    public Object getColData(String colName,String data){
         try{
             switch(data){
                 case "NAME" ->{
-                    return this.columns.get(colNum).getName();
+                    return this.columns.get(colName).getName();
                 }
                 case "TYPE" ->{
-                    return this.columns.get(colNum).getType();
+                    return this.columns.get(colName).getType();
                 }
                 case "STATE" ->{
-                    return this.columns.get(colNum).getState();
+                    return this.columns.get(colName).getState();
                 }
                 case "NullType" ->{
-                    return this.columns.get(colNum).getNull();
+                    return this.columns.get(colName).getNull();
                 }
                 case "PRIMARY" ->{
-                    return this.columns.get(colNum).getPrKey();
+                    return this.columns.get(colName).getPrKey();
                 }
                 default ->{
                     return null;
@@ -48,7 +50,33 @@ public class Table {
             return null;
         }
     }
-    public ArrayList<Col> getColList(){
+    public Object getColData(int colNum,String data){
+        try{
+            switch(data){
+                case "NAME" ->{
+                    return this.columns.getByIndex(colNum).getName();
+                }
+                case "TYPE" ->{
+                    return this.columns.getByIndex(colNum).getType();
+                }
+                case "STATE" ->{
+                    return this.columns.getByIndex(colNum).getState();
+                }
+                case "NullType" ->{
+                    return this.columns.getByIndex(colNum).getNull();
+                }
+                case "PRIMARY" ->{
+                    return this.columns.getByIndex(colNum).getPrKey();
+                }
+                default ->{
+                    return null;
+                }
+            }
+        } catch(Exception e){
+            return null;
+        }
+    }
+    public IndexMap<String,Col> getColList(){
         return this.columns;
     }
 }

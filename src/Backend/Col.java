@@ -8,6 +8,7 @@ package Backend;
  *
  * @author emimo
  */
+import Data.*;
 import java.util.*;
 public class Col {
     private String name;

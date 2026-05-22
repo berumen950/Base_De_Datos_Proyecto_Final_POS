@@ -8,6 +8,7 @@ package Backend;
  *
  * @author emimo
  */
+import Data.*;
 import java.util.*;
 import javax.swing.table.*;
 import javax.swing.*;
@@ -18,9 +19,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.function.*;
 import java.util.concurrent.*;
-
 import java.util.*;
 public class DAO {
+    private record valueTag(Object value, Tag type) {}
     private final String dbURL;
     private final Map<String,Table> tables = new HashMap<>();
     private PGConnection pgcon;
@@ -43,6 +44,7 @@ public class DAO {
         try{
             Class.forName("org.postgresql.Driver");
             con = DriverManager.getConnection(dbURL,"admin","admin123");
+            con.setAutoCommit(false);
             pgcon = con.unwrap(PGConnection.class);
             st=con.createStatement();
             rs=st.executeQuery("SELECT dataSift()");
@@ -61,7 +63,7 @@ public class DAO {
             );
             
             for(JsonNode tableNode : root){
-                ArrayList<Col> colList = new ArrayList<>();
+                IndexMap<String,Col> colList = new IndexMap<>();
                 tableName=tableNode.get("table").asText();
                 
                 JsonNode columns = tableNode.get("columns");
@@ -69,25 +71,17 @@ public class DAO {
                 for(JsonNode col : columns){
                     String name = col.get("name").asText();
                     String typeText = col.get("type").asText();
-                    if(typeText.equals("INT") || typeText.equals("SERIAL") || typeText.equals("NUMERIC(10,2)")){
-                        type=Tag.NUMERICAL;
-                    }
-                    else if(typeText.equals("TEXT") || typeText.equals("VARCHAR")){
-                        type=Tag.STRING;
-                    }
-                    else if(typeText.equals("DATE")){
-                        type=Tag.DATE;
-                    }
-                    else if(typeText.equals("TIMESTAMP")){
-                        type=Tag.DATETIME;
-                    }
-                    else if(typeText.equals("BOOLEAN")){
-                        type=Tag.BOOLEAN;
-                    }
-                    else{
-                        type = Tag.DEFAULT;
-                    }
-                    Boolean nullable = Boolean.parseBoolean(col.get("nullable").asText());
+                    int typeOid = col.get("type_oid").intValue();
+                        type = switch (typeOid) {
+                        case 21, 23, 20 -> Tag.NUMERICAL;                    
+                        case 700, 701, 1700 -> Tag.NUMERICAL_PRECISION;      
+                        case 25, 1042, 1043 -> Tag.STRING;                   
+                        case 1114 -> Tag.DATETIME;                           
+                        case 1082, 1083 -> Tag.DATE;                         
+                        case 16 -> Tag.BOOLEAN;                              
+                        default -> Tag.DEFAULT;
+                    };
+                    Boolean nullable = col.get("nullable").asBoolean();
                     String data = col.path("comment").isNull() ? null : col.path("comment").asText();
                     if(data == null || data.isBlank()){
                         fixed=false;
@@ -125,9 +119,9 @@ public class DAO {
                         }
 
                     }
-                    Boolean autoIncrement = Boolean.parseBoolean(col.get("auto_increment").asText());
-                    Boolean prKey = Boolean.parseBoolean(col.get("primary_key").asText());
-                    colList.add(new Col(name,type,fixed,values,nullable,format,autoIncrement,prKey));
+                    Boolean autoIncrement = col.get("auto_increment").asBoolean();
+                    Boolean prKey = col.get("primary_key").asBoolean();
+                    colList.put(name,new Col(name,type,fixed,values,nullable,format,autoIncrement,prKey));
                 }
                 tables.put(tableName, new Table(tableName,colList));
             }
@@ -143,13 +137,21 @@ public class DAO {
         }
     }
     
+    
+    
+    
     public Table fetch(String name){
         return tables.get(name);
     }
     
-    public void consult(DefaultTableModel model,String name){
+    public void consult(DefaultTableModel model,String name,String filter){
         try{
-            query = con.prepareStatement("SELECT * FROM " + name);
+            if(filter.isBlank()){
+                query = con.prepareStatement("SELECT * FROM " + name);
+            }
+            else{
+                query = con.prepareStatement("SELECT * FROM " + name + " WHERE " + filter);
+            }
             rs= query.executeQuery();
             
             while(rs.next()){
@@ -170,67 +172,104 @@ public class DAO {
         }
     }
     
-    public void create(String name,LinkedHashMap<String,Object> values) throws Exception{
-        StringBuilder cols = new StringBuilder();
-        StringBuilder vals = new StringBuilder();
-        int i = 1;
-        
-        for (String col : values.keySet()) {
-            cols.append(col).append(",");
-            vals.append("?,");
+    
+    
+ 
+    public void create(String name,LinkedHashMap<String,ValueTag> values) throws Exception{
+        try{
+            StringBuilder cols = new StringBuilder();
+            StringBuilder vals = new StringBuilder();
+            int i = 1;
+
+            for (String col : values.keySet()) {
+                cols.append(col).append(",");
+                vals.append("?,");
+            }
+            cols.deleteCharAt(cols.length() - 1);
+            vals.deleteCharAt(vals.length() - 1);
+
+            String sql = "INSERT INTO " + name + "(" + cols + ")" + " VALUES (" + vals + ")";
+            query = con.prepareStatement(sql);
+            for (ValueTag valInfo : values.values()) {
+                System.out.println("Value: " + valInfo.getCast() + " Type: " + valInfo.getTag());
+                query.setObject(i, valInfo.getCast());
+                i++;
+            }
+            query.executeUpdate();
         }
-        cols.deleteCharAt(cols.length() - 1);
-        vals.deleteCharAt(vals.length() - 1);
-        
-        String sql = "INSERT INTO" + name + "(" + cols + ")" + " VALUES (" + vals + ")";
-        query = con.prepareStatement(sql);
-        for (Object value : values.values()) {
-            query.setObject(i, value);
-            i++;
+        catch (SQLException e){
+            try{
+                con.rollback();
+            } catch (SQLException rollbackError){
+                rollbackError.printStackTrace();
+            }
+            throw e;
         }
-        query.executeUpdate();
     }
-    public void delete(String name,LinkedHashMap<String,Object>position) throws Exception{
-        StringBuilder sql = new StringBuilder("DELETE FROM " + name + " WHERE ");
-        int i=1;
-        for(String col: position.keySet()){
-            sql.append(col).append(" = ? AND ");
+    public void delete(String name,LinkedHashMap<String,ValueTag>position) throws Exception{
+        try{
+            StringBuilder sql = new StringBuilder("DELETE FROM " + name + " WHERE ");
+            int i=1;
+            for(String col: position.keySet()){
+                sql.append(col).append(" = ? AND ");
+            }
+            sql.delete(sql.length()-5, sql.length());
+
+            query = con.prepareStatement(sql.toString());
+
+            for (ValueTag posInfo : position.values()) {
+                System.out.println("Position: " + posInfo.getCast() + " Type: " + posInfo.getTag());
+                query.setObject(i, posInfo.getCast());
+                i++;
+            }
+            query.executeUpdate();
+        } 
+        catch (SQLException e){
+            try{
+                con.rollback();
+            } catch (SQLException rollbackError){
+                rollbackError.printStackTrace();
+            }
+            throw e;
         }
-        sql.delete(sql.length()-5, sql.length());
-        
-        query = con.prepareStatement(sql.toString());
-        
-        for(Object id: position.values()){
-            query.setObject(i,id);
-            i++;
-        }
-        query.executeUpdate();
     }
-    public void update(String name,LinkedHashMap<String,Object> values, LinkedHashMap<String,Object> position)throws Exception{
-        StringBuilder cols = new StringBuilder();
-        StringBuilder idList = new StringBuilder();
-        int i=1;
-        for(String col:values.keySet()){
-            cols.append(col).append("=?,");
+    public void update(String name,LinkedHashMap<String,ValueTag> values, LinkedHashMap<String,ValueTag> position)throws Exception{
+        try{
+            StringBuilder cols = new StringBuilder();
+            StringBuilder idList = new StringBuilder();
+            int i=1;
+            for(String col:values.keySet()){
+                cols.append(col).append("=?,");
+            }
+            cols.deleteCharAt(cols.length()-1);
+            for(String id: position.keySet()){
+                idList.append(id).append("=? AND ");
+            }
+            idList.delete(idList.length()-5,idList.length());
+            String sql="UPDATE " + name + "SET " + cols + " WHERE " + idList;
+            query = con.prepareStatement(sql);
+            for(ValueTag valInfo: values.values()){
+                System.out.println("Value: " + valInfo.getCast() + " Type: " + valInfo.getTag());
+                query.setObject(i,valInfo.getCast());
+                i++;
+            }
+            for(ValueTag posInfo: position.values()){
+                System.out.println("Position: " + posInfo.getCast() + " Type: " + posInfo.getTag());
+                query.setObject(i,posInfo.getCast());
+                i++;
+            }
+            query.executeUpdate();
         }
-        cols.deleteCharAt(cols.length()-1);
-        for(String id: position.keySet()){
-            idList.append(id).append("=? AND ");
+        catch(SQLException e){
+            try{
+                con.rollback();
+            } catch (SQLException rollbackError){
+                rollbackError.printStackTrace();
+            }
+            throw e;
         }
-        idList.delete(idList.length()-5,idList.length());
-        String sql="UPDATE " + name + "SET " + cols + " WHERE " + idList;
-        query = con.prepareStatement(sql);
-        for(Object value: values.values()){
-            query.setObject(i,value);
-            i++;
-        }
-        for(Object id: position.values()){
-            query.setObject(i,id);
-            i++;
-        }
-        query.executeUpdate();
     }
-    public void actionSF(String name,String sql) throws Exception{
+    public void actionSF(String sql) throws Exception{
         query = con.prepareStatement(sql);
         query.executeUpdate();
     }

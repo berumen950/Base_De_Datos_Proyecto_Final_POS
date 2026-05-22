@@ -40,14 +40,15 @@ CREATE TABLE staff
     staff_id SERIAL PRIMARY KEY,
     first_name VARCHAR(125) NOT NULL,
     last_name VARCHAR(125) NOT NULL,
-    role_staff VARCHAR(125) NOT NULL,
+    role_staff VARCHAR(125) NOT NULL
+        CHECK (role_staff IN ('Manager', 'Sales Associate', 'Cashier', 'Inventory Manager', 'Assistant Manager')),
     birth_date DATE NOT NULL,
     address VARCHAR(125) NOT NULL,
     phone VARCHAR(20) NOT NULL,
     email VARCHAR(125) UNIQUE NOT NULL
 );
 
-COMMENT ON COLUMN staff.role_staff IS 'FIXED:NONE|FORMAT:NONE';
+COMMENT ON COLUMN staff.role_staff IS 'FIXED:Manager,Sales Associate,Cashier,Inventory Manager,Assistant Manager|FORMAT:NONE';
 COMMENT ON COLUMN staff.birth_date IS 'FIXED:NONE|FORMAT:DATE';
 COMMENT ON COLUMN staff.phone IS 'FIXED:NONE|FORMAT:PHONE';
 COMMENT ON COLUMN staff.email IS 'FIXED:NONE|FORMAT:EMAIL';
@@ -61,37 +62,6 @@ CREATE TABLE sales_outlets
 );
 
 COMMENT ON COLUMN sales_outlets.phone IS 'FIXED:NONE|FORMAT:PHONE';
-
-CREATE TABLE sales_transactions
-(
-    transaction_id SERIAL PRIMARY KEY,
-
-    transaction_datetime TIMESTAMP NOT NULL,
-
-    wholesale_price NUMERIC(10,2) NOT NULL
-        CHECK (wholesale_price >= 0),
-
-    retail_price NUMERIC(10,2) NOT NULL
-        CHECK (retail_price >= 0),
-
-    customer_id INT NOT NULL,
-    staff_id INT NOT NULL,
-    sales_outlet_id INT NOT NULL,
-
-
--- Falta cascade y delete action
-    FOREIGN KEY (customer_id)
-        REFERENCES customers(customer_id),
-
-    FOREIGN KEY (staff_id)
-        REFERENCES staff(staff_id),
-
-    FOREIGN KEY (sales_outlet_id)
-        REFERENCES sales_outlets(sales_outlet_id)
-);
-
-
-COMMENT ON COLUMN sales_transactions.transaction_datetime IS 'FIXED:NONE|FORMAT:DATETIME';
 
 CREATE TABLE payment_methods
 (
@@ -120,6 +90,40 @@ CREATE TABLE products
         CHECK (retail_price >= 0)
 );
 
+CREATE TABLE sales_transactions
+(
+    transaction_id SERIAL PRIMARY KEY,
+
+    transaction_datetime TIMESTAMP NOT NULL,
+
+    wholesale_price NUMERIC(10,2) NOT NULL
+        CHECK (wholesale_price >= 0),
+
+    retail_price NUMERIC(10,2) NOT NULL
+        CHECK (retail_price >= 0),
+
+    customer_id INT NOT NULL,
+    staff_id INT NOT NULL,
+    sales_outlet_id INT NOT NULL,
+
+    FOREIGN KEY (customer_id)
+        REFERENCES customers(customer_id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    FOREIGN KEY (staff_id)
+        REFERENCES staff(staff_id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
+
+    FOREIGN KEY (sales_outlet_id)
+        REFERENCES sales_outlets(sales_outlet_id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+);
+
+COMMENT ON COLUMN sales_transactions.transaction_datetime IS 'FIXED:NONE|FORMAT:DATETIME';
+
 CREATE TABLE transaction_products
 (
     transaction_id INT NOT NULL,
@@ -131,10 +135,14 @@ CREATE TABLE transaction_products
     PRIMARY KEY (transaction_id, product_id),
 
     FOREIGN KEY (transaction_id)
-        REFERENCES sales_transactions(transaction_id),
+        REFERENCES sales_transactions(transaction_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
 
     FOREIGN KEY (product_id)
         REFERENCES products(product_id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
 );
 
 CREATE TABLE payments
@@ -152,15 +160,17 @@ CREATE TABLE payments
     payment_method_code VARCHAR(125) NOT NULL,
 
     FOREIGN KEY (transaction_id)
-        REFERENCES sales_transactions(transaction_id),
+        REFERENCES sales_transactions(transaction_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
 
     FOREIGN KEY (payment_method_code)
         REFERENCES payment_methods(payment_method_code)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
 );
 
 COMMENT ON COLUMN payments.payment_date IS 'FIXED:NONE|FORMAT:DATE';
-
-
 
 
 CREATE OR REPLACE FUNCTION dataSift()
@@ -181,10 +191,9 @@ SELECT json_agg(
                 json_build_object(
 
                     'name', c.column_name,
-                    'type', c.data_type,
-                    'nullable', c.is_nullable,
-                    'comment',
-                    pgd.description,
+                    'type_oid', a.atttypid,
+                    'nullable', c.is_nullable = 'YES',
+                    'comment', pgd.description,
                     'auto_increment',
                     CASE
                         WHEN c.column_default LIKE 'nextval(%'
@@ -206,12 +215,17 @@ SELECT json_agg(
 
             FROM information_schema.columns c
 
-            LEFT JOIN pg_catalog.pg_statio_all_tables st
-                ON st.relname = c.table_name
+            LEFT JOIN pg_catalog.pg_class pc
+                ON pc.relname = c.table_name
+                AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+
+            LEFT JOIN pg_catalog.pg_attribute a
+                ON a.attrelid = pc.oid
+                AND a.attname = c.column_name
 
             LEFT JOIN pg_catalog.pg_description pgd
-                ON pgd.objoid = st.relid
-                AND pgd.objsubid = c.ordinal_position
+                ON pgd.objoid = pc.oid
+                AND pgd.objsubid = a.attnum
 
             LEFT JOIN (
 
@@ -225,6 +239,7 @@ SELECT json_agg(
                     ON tc.constraint_name = kcu.constraint_name
 
                 WHERE tc.constraint_type = 'PRIMARY KEY'
+                  AND tc.table_schema = 'public'
 
             ) pk
 
@@ -251,6 +266,8 @@ FROM (
 ) t;
 
 $$;
+
+
 
 
 CREATE OR REPLACE FUNCTION fin_transaction(
