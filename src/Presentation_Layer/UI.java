@@ -665,6 +665,10 @@ public class UI extends javax.swing.JFrame {
         filterSQLSF = sql.toString();
         this.access.consult(model, currentSF, filterSQLSF);
     }
+    public void unapplySF(){
+        filterSQLSF="";
+        this.access.consult(model, currentSF, filterSQLSF);
+    }
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -833,6 +837,7 @@ public class UI extends javax.swing.JFrame {
         applyBtn.addActionListener(this::applyBtnActionPerformed);
 
         unapplyBtn.setText("Unapply");
+        unapplyBtn.addActionListener(this::unapplyBtnActionPerformed);
 
         javax.swing.GroupLayout jPanel9Layout = new javax.swing.GroupLayout(jPanel9);
         jPanel9.setLayout(jPanel9Layout);
@@ -1310,6 +1315,10 @@ public class UI extends javax.swing.JFrame {
     private void applyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyBtnActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_applyBtnActionPerformed
+
+    private void unapplyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unapplyBtnActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_unapplyBtnActionPerformed
 
     /**
      * @param args the command line arguments
