@@ -98,6 +98,7 @@ public class UI extends javax.swing.JFrame {
     private TableRowSorter<DefaultTableModel> search;
     private boolean loaded=false;
     private boolean table_inUse=false;
+    private Color titleColor=Color.BLACK;
     
     /**
      * Creates new form UI
@@ -112,6 +113,8 @@ public class UI extends javax.swing.JFrame {
         String[] fonts = ge.getAvailableFontFamilyNames();
         fontSel.setModel(new DefaultComboBoxModel<>(fonts));
         titleFontSel.setModel(new DefaultComboBoxModel<>(fonts));
+        textSizeSpinnor.setModel(new SpinnerNumberModel(12,6,72,1));
+        titleSizeSpinnor.setModel(new SpinnerNumberModel(24,12,84,1));
         this.inputPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         this.SFbarPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
         access.start(tableSelect);
@@ -777,6 +780,7 @@ public class UI extends javax.swing.JFrame {
         jSeparator2 = new javax.swing.JSeparator();
         pdfPreviewBtn = new javax.swing.JButton();
         pdfExportBtn = new javax.swing.JButton();
+        PDFgenBtn = new javax.swing.JButton();
         jPanel3 = new javax.swing.JPanel();
         jPanel2 = new javax.swing.JPanel();
         addValueBtn = new javax.swing.JButton();
@@ -1216,6 +1220,7 @@ public class UI extends javax.swing.JFrame {
         italicTitleOpt.setText("Italic");
 
         colorBtn.setText("Color Picker");
+        colorBtn.addActionListener(this::colorChoice);
 
         jLabel5.setText("Title Fonts");
 
@@ -1226,6 +1231,8 @@ public class UI extends javax.swing.JFrame {
         pdfPreviewBtn.setText("Preview");
 
         pdfExportBtn.setText("Export");
+
+        PDFgenBtn.setText("Generate");
 
         javax.swing.GroupLayout jPanel11Layout = new javax.swing.GroupLayout(jPanel11);
         jPanel11.setLayout(jPanel11Layout);
@@ -1274,15 +1281,17 @@ public class UI extends javax.swing.JFrame {
                                         .addComponent(titleSizeSpinnor, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                         .addGap(0, 0, Short.MAX_VALUE))))))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel11Layout.createSequentialGroup()
-                        .addContainerGap(10, Short.MAX_VALUE)
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 648, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(PDFgenBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 98, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 24, Short.MAX_VALUE)
                 .addComponent(pdfPreviewBtn)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 106, Short.MAX_VALUE)
+                .addGap(34, 34, 34)
                 .addComponent(pdfExportBtn)
-                .addGap(61, 61, 61))
+                .addGap(15, 15, 15))
         );
         jPanel11Layout.setVerticalGroup(
             jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1324,7 +1333,8 @@ public class UI extends javax.swing.JFrame {
                                 .addGap(71, 71, 71)
                                 .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                     .addComponent(pdfPreviewBtn)
-                                    .addComponent(pdfExportBtn))))
+                                    .addComponent(pdfExportBtn)
+                                    .addComponent(PDFgenBtn))))
                         .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -1644,6 +1654,10 @@ public class UI extends javax.swing.JFrame {
     }
     lowStockTrigger.setText(lowStockTrigger.isSelected()? "Low Stock: ON": "Low Stock: OFF");
     }//GEN-LAST:event_Activated
+
+    private void colorChoice(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_colorChoice
+        titleColor = JColorChooser.showDialog(this, "Pick Title Color",Color.BLACK);
+    }//GEN-LAST:event_colorChoice
 private void handleLowStockUI(LowStockEvent event) {
     SwingUtilities.invokeLater(() -> {
         JOptionPane.showMessageDialog(
@@ -1682,6 +1696,7 @@ private void handleLowStockUI(LowStockEvent event) {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton PDFgenBtn;
     private javax.swing.JTable SFTable;
     private javax.swing.JDialog SFWindow;
     private javax.swing.JPanel SFbarPanel;

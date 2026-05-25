@@ -21,7 +21,9 @@ public class PDFStyle {
     private boolean boldText;
     private boolean italicText;
 
-
+    public PDFStyle(){
+        
+    }
     public PDFStyle(String title, int titleTextSize, Font titleFont, boolean boldTitle, boolean italicTitle,Color titleColor,
                     Font textFont, int textSize, boolean boldText, boolean italicText) {
         this.title = title;

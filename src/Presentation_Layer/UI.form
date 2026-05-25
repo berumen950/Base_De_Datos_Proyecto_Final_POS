@@ -895,17 +895,19 @@
                                   </Group>
                               </Group>
                               <Group type="102" alignment="1" attributes="0">
-                                  <EmptySpace pref="10" max="32767" attributes="0"/>
+                                  <EmptySpace max="32767" attributes="0"/>
                                   <Component id="jSeparator1" min="-2" pref="648" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                           <EmptySpace max="-2" attributes="0"/>
                           <Component id="jSeparator2" min="-2" pref="50" max="-2" attributes="0"/>
                           <EmptySpace max="-2" attributes="0"/>
+                          <Component id="PDFgenBtn" min="-2" pref="98" max="-2" attributes="0"/>
+                          <EmptySpace pref="24" max="32767" attributes="0"/>
                           <Component id="pdfPreviewBtn" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace pref="106" max="32767" attributes="0"/>
+                          <EmptySpace min="-2" pref="34" max="-2" attributes="0"/>
                           <Component id="pdfExportBtn" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace min="-2" pref="61" max="-2" attributes="0"/>
+                          <EmptySpace min="-2" pref="15" max="-2" attributes="0"/>
                       </Group>
                   </Group>
                 </DimensionLayout>
@@ -956,6 +958,7 @@
                                           <Group type="103" groupAlignment="3" attributes="0">
                                               <Component id="pdfPreviewBtn" alignment="3" min="-2" max="-2" attributes="0"/>
                                               <Component id="pdfExportBtn" alignment="3" min="-2" max="-2" attributes="0"/>
+                                              <Component id="PDFgenBtn" alignment="3" min="-2" max="-2" attributes="0"/>
                                           </Group>
                                       </Group>
                                   </Group>
@@ -1021,6 +1024,9 @@
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Color Picker"/>
                   </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="colorChoice"/>
+                  </Events>
                 </Component>
                 <Component class="javax.swing.JComboBox" name="titleFontSel">
                   <Properties>
@@ -1059,6 +1065,11 @@
                 <Component class="javax.swing.JButton" name="pdfExportBtn">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Export"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JButton" name="PDFgenBtn">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Generate"/>
                   </Properties>
                 </Component>
               </SubComponents>
