@@ -18,9 +18,8 @@ import javax.swing.JTable;
 import javax.swing.table.*;
 import javax.swing.*;
 import java.io.File;
-
 import java.io.FileOutputStream;
-
+import org.openpdf.text.Document;
 
 
 
