@@ -9,11 +9,13 @@ package Presentation_Layer;
  * @author emimo
  */
 
+import Data.SortAndFilter;
 import Data.*;
 import java.awt.*;
 import java.util.function.*;
 import java.util.concurrent.*;
 import java.util.*;
+import java.util.regex.Pattern;
 import javax.swing.table.*;
 import javax.swing.*;
 import java.sql.*;
@@ -93,6 +95,7 @@ public class UI extends javax.swing.JFrame {
     private CustomRenderer renderer = new CustomRenderer();
     private Map<String,JComponent> fields = new HashMap<>();
     private Map<String,Object> rowData = new HashMap<>();
+    private TableRowSorter<DefaultTableModel> search;
     private boolean loaded=false;
     private boolean table_inUse=false;
     
@@ -102,7 +105,13 @@ public class UI extends javax.swing.JFrame {
     public UI() {
         initComponents();
         model = (DefaultTableModel) Table.getModel();
+        search = new TableRowSorter<>(model);
+        Table.setRowSorter(search);
         SFmodel = (DefaultTableModel) SFTable.getModel();
+        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        String[] fonts = ge.getAvailableFontFamilyNames();
+        fontSel.setModel(new DefaultComboBoxModel<>(fonts));
+        titleFontSel.setModel(new DefaultComboBoxModel<>(fonts));
         this.inputPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         this.SFbarPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
         access.start(tableSelect);
@@ -146,6 +155,7 @@ public class UI extends javax.swing.JFrame {
         this.colSelect.removeAllItems();
         this.colSFSelector.removeAllItems();
         this.colSortSelector.removeAllItems();
+        this.colAddSelect.removeAllItems();
         for(Map.Entry<String,Backend.Col> entry: tableObj.getColList().entrySet()){
             Backend.Col c = entry.getValue();
             this.colSelect.addItem(c.getName());
@@ -156,6 +166,9 @@ public class UI extends javax.swing.JFrame {
             }
             else{
                 model.addColumn(c.getName());
+            }
+            if(c.getState()){
+                this.colAddSelect.addItem(c.getName());
             }
             JPanel cell = new JPanel();
             cell.setLayout(new BoxLayout(cell,BoxLayout.Y_AXIS));
@@ -284,6 +297,8 @@ public class UI extends javax.swing.JFrame {
             
             access.consult(model, selected_table,filterSQLSF);
             this.table_inUse=true;
+            this.resetBtn.setEnabled(table_inUse);
+            Tcheck();
         }
         
     } catch (Exception e){
@@ -296,7 +311,18 @@ public class UI extends javax.swing.JFrame {
     
     
     
-
+    public void search(){
+        String searchTxt = searchBar.getText();
+        Tag search_tag = tableObj.getColList().get(colSelect.getSelectedItem().toString()).getType();
+        int col=Table.getColumnModel().getColumnIndex(colSelect.getSelectedItem().toString());
+        
+        if(searchTxt == null || searchTxt.trim().isEmpty()){
+            search.setRowFilter(null);
+        }
+        else{
+            search.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(searchTxt),col));
+        }
+    }
     
     
     public void getData(int row){
@@ -547,6 +573,7 @@ public class UI extends javax.swing.JFrame {
         if(loaded && table_inUse){
             SFWindow.pack();
             SFWindow.setLocationRelativeTo(this);
+            loadSFSelector();
             SFWindow.setVisible(true);
         }
     }
@@ -632,12 +659,17 @@ public class UI extends javax.swing.JFrame {
         SF.put(SFName,new SortAndFilter(SFName,arguments,this.sortShowcasetxt.toString()));
         this.listSF.put(this.selected_table,SF);
         this.currentSF=SFName;
+        loadSFSelector();
     }
+    
+    
     public void deleteSFTable(){
         if(!currentSF.isBlank()){
             this.listSF.get(this.selected_table).remove(currentSF);
         }
     }
+    
+    
     public void loadSFTable(){
         SFmodel.setRowCount(0);
         SortAndFilter sf = this.listSF.get(this.selected_table).get(currentSF);
@@ -663,12 +695,18 @@ public class UI extends javax.swing.JFrame {
         }
         sql.append(sf.getSorter());
         filterSQLSF = sql.toString();
-        this.access.consult(model, currentSF, filterSQLSF);
+        this.access.consult(model, selected_table, filterSQLSF);
     }
-    public void unapplySF(){
+    
+    public void undoSF(){
         filterSQLSF="";
-        this.access.consult(model, currentSF, filterSQLSF);
+        this.access.consult(model, selected_table, filterSQLSF);
     }
+    
+    public void Tcheck(){
+        transactionBtn.setEnabled(loaded && "sales_transactions".equals(selected_table));
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -700,6 +738,7 @@ public class UI extends javax.swing.JFrame {
         jPanel10 = new javax.swing.JPanel();
         sortLabel = new javax.swing.JLabel();
         sortShowcasetxt = new javax.swing.JTextField();
+        jColorChooser1 = new javax.swing.JColorChooser();
         jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel1 = new javax.swing.JPanel();
         inputPanel = new javax.swing.JPanel();
@@ -713,18 +752,38 @@ public class UI extends javax.swing.JFrame {
         jLabel1 = new javax.swing.JLabel();
         searchBar = new javax.swing.JTextField();
         colSelect = new javax.swing.JComboBox<>();
-        serachBtn = new javax.swing.JButton();
+        searchBtn = new javax.swing.JButton();
         tableOpPanel = new javax.swing.JPanel();
         tableSelect = new javax.swing.JComboBox<>();
         resetBtn = new javax.swing.JButton();
         jPanel4 = new javax.swing.JPanel();
+        jPanel11 = new javax.swing.JPanel();
+        fontSel = new javax.swing.JComboBox<>();
+        jLabel2 = new javax.swing.JLabel();
+        textSizeSpinnor = new javax.swing.JSpinner();
+        jLabel3 = new javax.swing.JLabel();
+        boldOpt = new javax.swing.JCheckBox();
+        italicOpt = new javax.swing.JCheckBox();
+        titleTxtInput = new javax.swing.JTextField();
+        jLabel4 = new javax.swing.JLabel();
+        boldTitleOpt = new javax.swing.JCheckBox();
+        italicTitleOpt = new javax.swing.JCheckBox();
+        colorBtn = new javax.swing.JButton();
+        titleFontSel = new javax.swing.JComboBox<>();
+        jLabel5 = new javax.swing.JLabel();
+        titleSizeSpinnor = new javax.swing.JSpinner();
+        jLabel6 = new javax.swing.JLabel();
+        jSeparator1 = new javax.swing.JSeparator();
+        jSeparator2 = new javax.swing.JSeparator();
+        pdfPreviewBtn = new javax.swing.JButton();
+        pdfExportBtn = new javax.swing.JButton();
         jPanel3 = new javax.swing.JPanel();
         jPanel2 = new javax.swing.JPanel();
         addValueBtn = new javax.swing.JButton();
         valueBar = new javax.swing.JTextField();
         colAddSelect = new javax.swing.JComboBox<>();
         jPanel6 = new javax.swing.JPanel();
-        func1Btn = new javax.swing.JButton();
+        transactionBtn = new javax.swing.JButton();
         lowStockTrigger = new javax.swing.JRadioButton();
         jScrollPane1 = new javax.swing.JScrollPane();
         Table = new javax.swing.JTable();
@@ -741,10 +800,13 @@ public class UI extends javax.swing.JFrame {
         sMODIFY.addActionListener(this::sMODIFYActionPerformed);
 
         fUpdateBtn.setText("FUPDATE");
+        fUpdateBtn.addActionListener(this::fUpdateBtnActionPerformed);
 
         fDeleteBtn.setText("FDELETE");
+        fDeleteBtn.addActionListener(this::fDeleteBtnActionPerformed);
 
         sDelete.setText("SDELETE");
+        sDelete.addActionListener(this::sDeleteActionPerformed);
 
         fAddBtn.setText("FADD");
         fAddBtn.addActionListener(this::fAddBtnActionPerformed);
@@ -829,9 +891,13 @@ public class UI extends javax.swing.JFrame {
                 .addGap(9, 9, 9))
         );
 
+        sfObjSelector.addItemListener(this::tableShiftSF);
+
         sfCreateBtn.setText("SFCREATE");
+        sfCreateBtn.addActionListener(this::sfCreateBtnActionPerformed);
 
         sfDelete.setText("SFDELETE");
+        sfDelete.addActionListener(this::sfDeleteActionPerformed);
 
         applyBtn.setText("Apply");
         applyBtn.addActionListener(this::applyBtnActionPerformed);
@@ -909,6 +975,11 @@ public class UI extends javax.swing.JFrame {
                 return canEdit [columnIndex];
             }
         });
+        SFTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                interactSFTable(evt);
+            }
+        });
         jScrollPane2.setViewportView(SFTable);
 
         jPanel10.setBackground(new java.awt.Color(0, 153, 204));
@@ -981,6 +1052,8 @@ public class UI extends javax.swing.JFrame {
             .addGap(0, 109, Short.MAX_VALUE)
         );
 
+        btnPanel.setOpaque(false);
+
         createBtn.setText("Agregar");
         createBtn.addActionListener(this::createBtnActionPerformed);
 
@@ -1023,12 +1096,15 @@ public class UI extends javax.swing.JFrame {
                     .addComponent(clearBtn)
                     .addComponent(deleteBtn)
                     .addComponent(sfMenuBtn))
-                .addGap(152, 152, 152))
+                .addGap(188, 188, 188))
         );
+
+        jPanel5.setOpaque(false);
 
         jLabel1.setText("Search");
 
-        serachBtn.setText("Search");
+        searchBtn.setText("Search");
+        searchBtn.addActionListener(this::searchBtnActionPerformed);
 
         javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
@@ -1042,27 +1118,33 @@ public class UI extends javax.swing.JFrame {
                         .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                     .addGroup(jPanel5Layout.createSequentialGroup()
                         .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, 280, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(serachBtn)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 37, Short.MAX_VALUE)
+                        .addComponent(searchBtn)
+                        .addGap(26, 26, 26)
                         .addComponent(colSelect, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(15, 15, 15))))
+                        .addGap(17, 17, 17))))
         );
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel5Layout.createSequentialGroup()
-                .addComponent(jLabel1)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(colSelect, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(serachBtn))
-                .addContainerGap())
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(searchBtn)
+                        .addComponent(colSelect, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel5Layout.createSequentialGroup()
+                        .addComponent(jLabel1)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(searchBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap(7, Short.MAX_VALUE))
         );
+
+        tableOpPanel.setOpaque(false);
 
         tableSelect.addItemListener(this::tableSelectItemStateChanged);
 
         resetBtn.setText("Reset");
+        resetBtn.setEnabled(false);
+        resetBtn.addActionListener(this::resetBtnActionPerformed);
 
         javax.swing.GroupLayout tableOpPanelLayout = new javax.swing.GroupLayout(tableOpPanel);
         tableOpPanel.setLayout(tableOpPanelLayout);
@@ -1099,7 +1181,7 @@ public class UI extends javax.swing.JFrame {
                             .addGap(18, 18, 18)
                             .addComponent(btnPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addComponent(inputPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(12, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1119,23 +1201,156 @@ public class UI extends javax.swing.JFrame {
 
         jPanel4.setBackground(new java.awt.Color(51, 153, 255));
 
+        jLabel2.setText("Fonts");
+
+        jLabel3.setText("Text size");
+
+        boldOpt.setText("Bold");
+
+        italicOpt.setText("Italic");
+
+        jLabel4.setText("Title");
+
+        boldTitleOpt.setText("Bold");
+
+        italicTitleOpt.setText("Italic");
+
+        colorBtn.setText("Color Picker");
+
+        jLabel5.setText("Title Fonts");
+
+        jLabel6.setText("Title size");
+
+        jSeparator2.setOrientation(javax.swing.SwingConstants.VERTICAL);
+
+        pdfPreviewBtn.setText("Preview");
+
+        pdfExportBtn.setText("Export");
+
+        javax.swing.GroupLayout jPanel11Layout = new javax.swing.GroupLayout(jPanel11);
+        jPanel11.setLayout(jPanel11Layout);
+        jPanel11Layout.setHorizontalGroup(
+            jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel11Layout.createSequentialGroup()
+                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel11Layout.createSequentialGroup()
+                        .addGap(52, 52, 52)
+                        .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel4)
+                            .addGroup(jPanel11Layout.createSequentialGroup()
+                                .addComponent(jLabel2)
+                                .addGap(162, 162, 162)
+                                .addComponent(jLabel3))
+                            .addGroup(jPanel11Layout.createSequentialGroup()
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(jPanel11Layout.createSequentialGroup()
+                                        .addComponent(fontSel, javax.swing.GroupLayout.PREFERRED_SIZE, 120, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(71, 71, 71)
+                                        .addComponent(textSizeSpinnor, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(titleTxtInput, javax.swing.GroupLayout.PREFERRED_SIZE, 255, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addGap(57, 57, 57)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                    .addGroup(jPanel11Layout.createSequentialGroup()
+                                        .addComponent(boldTitleOpt)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .addComponent(italicTitleOpt))
+                                    .addGroup(jPanel11Layout.createSequentialGroup()
+                                        .addComponent(boldOpt)
+                                        .addGap(27, 27, 27)
+                                        .addComponent(italicOpt)))
+                                .addGap(39, 39, 39)
+                                .addComponent(colorBtn))
+                            .addGroup(jPanel11Layout.createSequentialGroup()
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel11Layout.createSequentialGroup()
+                                        .addComponent(titleFontSel, javax.swing.GroupLayout.PREFERRED_SIZE, 116, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(75, 75, 75))
+                                    .addGroup(jPanel11Layout.createSequentialGroup()
+                                        .addComponent(jLabel5)
+                                        .addGap(136, 136, 136)))
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(jLabel6, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                    .addGroup(jPanel11Layout.createSequentialGroup()
+                                        .addComponent(titleSizeSpinnor, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(0, 0, Short.MAX_VALUE))))))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel11Layout.createSequentialGroup()
+                        .addContainerGap(10, Short.MAX_VALUE)
+                        .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 648, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jSeparator2, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(pdfPreviewBtn)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 106, Short.MAX_VALUE)
+                .addComponent(pdfExportBtn)
+                .addGap(61, 61, 61))
+        );
+        jPanel11Layout.setVerticalGroup(
+            jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel11Layout.createSequentialGroup()
+                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jSeparator2)
+                    .addGroup(jPanel11Layout.createSequentialGroup()
+                        .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(jPanel11Layout.createSequentialGroup()
+                                .addGap(15, 15, 15)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(jLabel2)
+                                    .addComponent(jLabel3))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(fontSel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(textSizeSpinnor, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(boldOpt)
+                                    .addComponent(italicOpt))
+                                .addGap(18, 18, 18)
+                                .addComponent(jSeparator1, javax.swing.GroupLayout.PREFERRED_SIZE, 10, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(jLabel4)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(titleTxtInput, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(boldTitleOpt)
+                                    .addComponent(italicTitleOpt)
+                                    .addComponent(colorBtn))
+                                .addGap(4, 4, 4)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(jLabel5)
+                                    .addComponent(jLabel6))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(titleFontSel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(titleSizeSpinnor, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                            .addGroup(jPanel11Layout.createSequentialGroup()
+                                .addGap(71, 71, 71)
+                                .addGroup(jPanel11Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(pdfPreviewBtn)
+                                    .addComponent(pdfExportBtn))))
+                        .addGap(0, 0, Short.MAX_VALUE)))
+                .addContainerGap())
+        );
+
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 998, Short.MAX_VALUE)
+            .addComponent(jPanel11, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 238, Short.MAX_VALUE)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addGap(24, 24, 24)
+                .addComponent(jPanel11, javax.swing.GroupLayout.PREFERRED_SIZE, 187, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(27, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("REPORTS", jPanel4);
 
         jPanel3.setBackground(new java.awt.Color(51, 153, 255));
 
+        jPanel2.setOpaque(false);
+
         addValueBtn.setText("Add Value");
-        addValueBtn.addActionListener(this::addValueBtnActionPerformed);
+        addValueBtn.addActionListener(this::addFixedValue);
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
@@ -1163,29 +1378,34 @@ public class UI extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        func1Btn.setText("func1");
+        jPanel6.setOpaque(false);
+
+        transactionBtn.setText("Transaccion");
+        transactionBtn.setEnabled(false);
+        transactionBtn.addActionListener(this::transactionSQL);
 
         lowStockTrigger.setText("Low Stock Alert");
+        lowStockTrigger.addItemListener(this::Activated);
 
         javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
         jPanel6.setLayout(jPanel6Layout);
         jPanel6Layout.setHorizontalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel6Layout.createSequentialGroup()
-                .addGap(26, 26, 26)
-                .addComponent(func1Btn)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 51, Short.MAX_VALUE)
+                .addGap(23, 23, 23)
+                .addComponent(transactionBtn)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 54, Short.MAX_VALUE)
                 .addComponent(lowStockTrigger)
                 .addGap(17, 17, 17))
         );
         jPanel6Layout.setVerticalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
-                .addContainerGap(69, Short.MAX_VALUE)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addContainerGap(68, Short.MAX_VALUE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(lowStockTrigger)
-                    .addComponent(func1Btn))
-                .addGap(64, 64, 64))
+                    .addComponent(transactionBtn))
+                .addGap(65, 65, 65))
         );
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
@@ -1197,7 +1417,7 @@ public class UI extends javax.swing.JFrame {
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(26, 26, 26)
                 .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(437, Short.MAX_VALUE))
+                .addContainerGap(448, Short.MAX_VALUE))
         );
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1261,10 +1481,6 @@ public class UI extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void addValueBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addValueBtnActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_addValueBtnActionPerformed
-
     private void sfMenuBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sfMenuBtnActionPerformed
         SFopen();
     }//GEN-LAST:event_sfMenuBtnActionPerformed
@@ -1306,20 +1522,140 @@ public class UI extends javax.swing.JFrame {
         String sortOp = this.sortOperatorSelect.getSelectedItem().toString();
         String sortSQL= " ORDER BY " + colSort + " " + sortOp;
         this.sortShowcasetxt.setText(sortSQL);
+        this.listSF.get(this.selected_table).get(currentSF).setSorter(sortSQL);
     }//GEN-LAST:event_sMODIFYActionPerformed
 
     private void fAddBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fAddBtnActionPerformed
-        // TODO add your handling code here:
+        addSF();
     }//GEN-LAST:event_fAddBtnActionPerformed
 
     private void applyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyBtnActionPerformed
-        // TODO add your handling code here:
+        applySF();
     }//GEN-LAST:event_applyBtnActionPerformed
 
     private void unapplyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unapplyBtnActionPerformed
-        // TODO add your handling code here:
+        undoSF();
     }//GEN-LAST:event_unapplyBtnActionPerformed
 
+    private void resetBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_resetBtnActionPerformed
+        this.search.setRowFilter(null);
+        access.consult(model,selected_table,filterSQLSF);
+    }//GEN-LAST:event_resetBtnActionPerformed
+
+    private void searchBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_searchBtnActionPerformed
+    search();
+    }//GEN-LAST:event_searchBtnActionPerformed
+
+    private void tableShiftSF(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_tableShiftSF
+        if (evt.getStateChange() != java.awt.event.ItemEvent.SELECTED) return;
+        currentSF=sfObjSelector.getSelectedItem().toString();
+        if(loaded && !currentSF.isBlank()){
+           loadSFTable(); 
+        }
+    }//GEN-LAST:event_tableShiftSF
+
+    private void sfCreateBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sfCreateBtnActionPerformed
+        createSFTable();
+    }//GEN-LAST:event_sfCreateBtnActionPerformed
+
+    private void sfDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sfDeleteActionPerformed
+        deleteSFTable();
+    }//GEN-LAST:event_sfDeleteActionPerformed
+
+    private void fDeleteBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fDeleteBtnActionPerformed
+        int sfRow = SFTable.convertRowIndexToModel(SFTable.getSelectedRow());
+        try{
+            deleteSF(sfRow);
+        }
+        catch(Exception e){
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }//GEN-LAST:event_fDeleteBtnActionPerformed
+
+    private void fUpdateBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fUpdateBtnActionPerformed
+        int sfRow = SFTable.convertRowIndexToModel(SFTable.getSelectedRow());
+        try{
+            updateSF(sfRow);
+        }
+        catch(Exception e){
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+        }
+    }//GEN-LAST:event_fUpdateBtnActionPerformed
+
+    private void sDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sDeleteActionPerformed
+    this.sortShowcasetxt.setText("");
+    this.listSF.get(this.selected_table).get(currentSF).setSorter("");
+    }//GEN-LAST:event_sDeleteActionPerformed
+
+    private void interactSFTable(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_interactSFTable
+        int sfRow = SFTable.convertRowIndexToModel(SFTable.getSelectedRow());
+        getDataSFT(sfRow);
+    }//GEN-LAST:event_interactSFTable
+
+    private void addFixedValue(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addFixedValue
+        String nfValue = this.valueBar.getText();
+        String col = this.colAddSelect.getSelectedItem().toString();
+        if(nfValue.isBlank() && col.isBlank()){
+            JOptionPane.showMessageDialog(this,"Error, ni el valor y la columna pueden estar vacios.");
+            return;
+        }
+        String addSQL = String.format("SELECT add_fixed_value('%s','%s','%s')",selected_table,col,nfValue);
+        try{
+            access.actionSP(addSQL);
+        }
+        catch (Exception e){
+            JOptionPane.showMessageDialog(this, "Error, desafortunadamente ha habido un error: " + e.getMessage());
+            return;
+        }
+    }//GEN-LAST:event_addFixedValue
+
+    private void transactionSQL(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_transactionSQL
+        if(rowData.isEmpty() && Table.getSelectedRow() == -1){
+            JOptionPane.showMessageDialog(this,"Error, la informacion no puede estar vacia y ocupa selecionar una fila.");
+            return;
+        }
+        String tID = "";
+        for(Map.Entry<String,Backend.Col> entry : tableObj.getColList().entrySet()){
+        Backend.Col c = entry.getValue();
+            if(c.getPrKey()){
+                tID=rowData.get(c.getName()).toString();
+            }
+        }
+        if (tID == null) {
+            JOptionPane.showMessageDialog(this, "No se encontró la PK.");
+            return;
+        }
+        String tSQL = "SELECT fin_transaction(" + tID + ")";
+        try{
+            access.actionSP(tSQL);
+        }
+        catch (Exception e){
+            JOptionPane.showMessageDialog(this, "Error, desafortunadamente ha habido un error: " + e.getMessage());
+            return;
+        }
+    }//GEN-LAST:event_transactionSQL
+
+    private void Activated(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_Activated
+    if (evt.getStateChange() != java.awt.event.ItemEvent.SELECTED) return;
+    if (evt.getStateChange() == ItemEvent.SELECTED) {
+        access.startListening(this::handleLowStockUI);
+    } else {
+        access.stopListening();
+    }
+    lowStockTrigger.setText(lowStockTrigger.isSelected()? "Low Stock: ON": "Low Stock: OFF");
+    }//GEN-LAST:event_Activated
+private void handleLowStockUI(LowStockEvent event) {
+    SwingUtilities.invokeLater(() -> {
+        JOptionPane.showMessageDialog(
+            this,
+            "Low stock detected:\n" +
+            event.getName() +
+            " (Stock: " + event.getStock() + ")",
+            "Alert",
+            JOptionPane.WARNING_MESSAGE
+        );
+    });
+}
     /**
      * @param args the command line arguments
      */
@@ -1352,12 +1688,15 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JTable Table;
     private javax.swing.JButton addValueBtn;
     private javax.swing.JButton applyBtn;
+    private javax.swing.JCheckBox boldOpt;
+    private javax.swing.JCheckBox boldTitleOpt;
     private javax.swing.JPanel btnPanel;
     private javax.swing.JButton clearBtn;
     private javax.swing.JComboBox<String> colAddSelect;
     private javax.swing.JComboBox<String> colSFSelector;
     private javax.swing.JComboBox<String> colSelect;
     private javax.swing.JComboBox<String> colSortSelector;
+    private javax.swing.JButton colorBtn;
     private javax.swing.JComboBox<String> connectSelect;
     private javax.swing.JButton createBtn;
     private javax.swing.JButton deleteBtn;
@@ -1365,11 +1704,20 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JButton fDeleteBtn;
     private javax.swing.JButton fUpdateBtn;
     private javax.swing.JTextField filterBar;
-    private javax.swing.JButton func1Btn;
+    private javax.swing.JComboBox<String> fontSel;
     private javax.swing.JPanel inputPanel;
+    private javax.swing.JCheckBox italicOpt;
+    private javax.swing.JCheckBox italicTitleOpt;
+    private javax.swing.JColorChooser jColorChooser1;
     private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel jLabel3;
+    private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel6;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
+    private javax.swing.JPanel jPanel11;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
@@ -1380,14 +1728,18 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel9;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JSeparator jSeparator1;
+    private javax.swing.JSeparator jSeparator2;
     private javax.swing.JTabbedPane jTabbedPane1;
     private javax.swing.JRadioButton lowStockTrigger;
     private javax.swing.JComboBox<String> operatorSelect;
+    private javax.swing.JButton pdfExportBtn;
+    private javax.swing.JButton pdfPreviewBtn;
     private javax.swing.JButton resetBtn;
     private javax.swing.JButton sDelete;
     private javax.swing.JButton sMODIFY;
     private javax.swing.JTextField searchBar;
-    private javax.swing.JButton serachBtn;
+    private javax.swing.JButton searchBtn;
     private javax.swing.JTextField sfBar;
     private javax.swing.JButton sfCreateBtn;
     private javax.swing.JButton sfDelete;
@@ -1398,6 +1750,11 @@ public class UI extends javax.swing.JFrame {
     private javax.swing.JTextField sortShowcasetxt;
     private javax.swing.JPanel tableOpPanel;
     private javax.swing.JComboBox<String> tableSelect;
+    private javax.swing.JSpinner textSizeSpinnor;
+    private javax.swing.JComboBox<String> titleFontSel;
+    private javax.swing.JSpinner titleSizeSpinnor;
+    private javax.swing.JTextField titleTxtInput;
+    private javax.swing.JButton transactionBtn;
     private javax.swing.JButton unapplyBtn;
     private javax.swing.JButton updateBtn;
     private javax.swing.JTextField valueBar;

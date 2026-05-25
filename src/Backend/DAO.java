@@ -9,45 +9,33 @@ package Backend;
  * @author emimo
  */
 import Data.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.*;
 import javax.swing.table.*;
 import javax.swing.*;
 import java.sql.*;
-import org.postgresql.util.*;
 import org.postgresql.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.function.*;
-import java.util.concurrent.*;
-import java.util.*;
 public class DAO {
-    private record valueTag(Object value, Tag type) {}
     private final String dbURL;
     private final Map<String,Table> tables = new HashMap<>();
     private PGConnection pgcon;
     private Connection con;
-    private PreparedStatement query;
-    private Statement st;
-    private ResultSet rs;
-    private boolean listen;
-    
+    private volatile boolean listen;
     public DAO(String dbURL){
         this.dbURL=dbURL;
     }
     
     public void start(JComboBox<String> tableSelect){
-        String tableName=null;
-        String format=null;
-        Tag type=null;
-        boolean fixed=false;
-        List<String> values = new ArrayList<>();
         try{
             Class.forName("org.postgresql.Driver");
             con = DriverManager.getConnection(dbURL,"admin","admin123");
             con.setAutoCommit(false);
             pgcon = con.unwrap(PGConnection.class);
-            st=con.createStatement();
-            rs=st.executeQuery("SELECT dataSift()");
+            Statement st=con.createStatement();
+            ResultSet rs=st.executeQuery("SELECT dataSift()");
             
             String json = null;
             
@@ -64,13 +52,16 @@ public class DAO {
             
             for(JsonNode tableNode : root){
                 IndexMap<String,Col> colList = new IndexMap<>();
-                tableName=tableNode.get("table").asText();
+                String tableName=tableNode.get("table").asText();
                 
                 JsonNode columns = tableNode.get("columns");
                 
                 for(JsonNode col : columns){
+                    String format="NONE";
+                    Tag type=Tag.DEFAULT;
+                    boolean fixed=false;
+                    List<String> values = new ArrayList<>();
                     String name = col.get("name").asText();
-                    String typeText = col.get("type").asText();
                     int typeOid = col.get("type_oid").intValue();
                         type = switch (typeOid) {
                         case 21, 23, 20 -> Tag.NUMERICAL;                    
@@ -91,28 +82,21 @@ public class DAO {
                         String[] dataSplit = data.split("\\|");
                         
                         for (String part : dataSplit) {
-
+                            
                             if (part.startsWith("FIXED:")) {
 
-                                String fixedPart = part.substring(6); 
+                                String fixedPart = part.substring(6).trim();
 
-                                if (fixedPart.startsWith("TRUE")) {
-                                    fixed = true;
-
-                                    int start = fixedPart.indexOf('(');
-                                    int end = fixedPart.indexOf(')');
-
-                                    if (start != -1 && end != -1) {
-                                        String inside = fixedPart.substring(start + 1, end);
-                                        values = Arrays.asList(inside.split(","));
-                                    }
-
-                                } else {
-                                    fixed = false;
-                                    values=null;
+                                if(fixedPart.equalsIgnoreCase("NONE")){
+                                    fixed=false;
+                                }
+                                else{
+                                    fixed=true;
+                                    values = Arrays.asList(
+                                        fixedPart.split("\\s*,\\s*")
+                                    );
                                 }
                             }
-
                             if (part.startsWith("FORMAT:")) {
                                 format = part.substring(7);
                             }
@@ -129,7 +113,8 @@ public class DAO {
             for(String table : tables.keySet()){
                 tableSelect.addItem(table);
             }
-            
+            rs.close();
+            st.close();
         }
         catch(Exception e){
             System.out.println("DAO start error");
@@ -145,6 +130,7 @@ public class DAO {
     }
     
     public void consult(DefaultTableModel model,String name,String filter){
+        PreparedStatement query;
         try{
             if(filter.isBlank()){
                 query = con.prepareStatement("SELECT * FROM " + name);
@@ -152,12 +138,11 @@ public class DAO {
             else{
                 query = con.prepareStatement("SELECT * FROM " + name + " WHERE " + filter);
             }
-            rs= query.executeQuery();
-            
+            ResultSet rs= query.executeQuery();
+            ResultSetMetaData meta = rs.getMetaData();
+            int colCount = meta.getColumnCount();
             while(rs.next()){
                 
-                ResultSetMetaData meta = rs.getMetaData();
-                int colCount = meta.getColumnCount();
                 Object[] row = new Object[colCount];
 
                 for (int i = 1; i <= colCount; i++) {
@@ -166,6 +151,8 @@ public class DAO {
 
                 model.addRow(row);
             }
+            rs.close();
+            query.close();
         } catch (Exception e){
             System.out.println("Error at consult");
             System.out.println("Error: " + e.getMessage());
@@ -176,6 +163,7 @@ public class DAO {
     
  
     public void create(String name,LinkedHashMap<String,ValueTag> values) throws Exception{
+        PreparedStatement query;
         try{
             StringBuilder cols = new StringBuilder();
             StringBuilder vals = new StringBuilder();
@@ -196,6 +184,8 @@ public class DAO {
                 i++;
             }
             query.executeUpdate();
+            con.commit();
+            query.close();
         }
         catch (SQLException e){
             try{
@@ -207,6 +197,7 @@ public class DAO {
         }
     }
     public void delete(String name,LinkedHashMap<String,ValueTag>position) throws Exception{
+        PreparedStatement query;
         try{
             StringBuilder sql = new StringBuilder("DELETE FROM " + name + " WHERE ");
             int i=1;
@@ -223,6 +214,8 @@ public class DAO {
                 i++;
             }
             query.executeUpdate();
+            con.commit();
+            query.close();
         } 
         catch (SQLException e){
             try{
@@ -234,6 +227,7 @@ public class DAO {
         }
     }
     public void update(String name,LinkedHashMap<String,ValueTag> values, LinkedHashMap<String,ValueTag> position)throws Exception{
+        PreparedStatement query;
         try{
             StringBuilder cols = new StringBuilder();
             StringBuilder idList = new StringBuilder();
@@ -246,7 +240,7 @@ public class DAO {
                 idList.append(id).append("=? AND ");
             }
             idList.delete(idList.length()-5,idList.length());
-            String sql="UPDATE " + name + "SET " + cols + " WHERE " + idList;
+            String sql="UPDATE " + name + " SET " + cols + " WHERE " + idList;
             query = con.prepareStatement(sql);
             for(ValueTag valInfo: values.values()){
                 System.out.println("Value: " + valInfo.getCast() + " Type: " + valInfo.getTag());
@@ -259,6 +253,8 @@ public class DAO {
                 i++;
             }
             query.executeUpdate();
+            con.commit();
+            query.close();
         }
         catch(SQLException e){
             try{
@@ -269,36 +265,60 @@ public class DAO {
             throw e;
         }
     }
-    public void actionSF(String sql) throws Exception{
-        query = con.prepareStatement(sql);
-        query.executeUpdate();
+    
+    
+    public void actionSP(String sql) throws Exception{
+        PreparedStatement query;
+        try{
+            query=con.prepareStatement(sql);
+            query.executeUpdate();
+            con.commit();
+            query.close();
+        }
+        catch(SQLException e){
+
+            try{
+                con.rollback();
+            }
+            catch(SQLException ex){
+                ex.printStackTrace();
+            }
+
+            throw e;
+        }
     }
-    public void StartListening(Consumer<String> receiver){
+    public void startListening(Consumer<LowStockEvent> receiver){
         if(this.listen){
             return;
         }
-        this.listen=true;
-        
         Thread listenThread = new Thread(()->{
-                try{
-                    st = con.createStatement();
+                try(Statement st = con.createStatement()){
                     st.execute("LISTEN low_stock_channel");
-                   
+                    ObjectMapper mapper = new ObjectMapper();
                     while(listen){
                         PGNotification[] notifications = pgcon.getNotifications();
 
                         if(notifications != null){
                             for(PGNotification n: notifications){
-                                receiver.accept(n.getParameter());
+                                LowStockEvent event =
+                                mapper.readValue(n.getParameter(), LowStockEvent.class);
+
+                                receiver.accept(event);
                             }
                         }
                         Thread.sleep(1000);
                     }
                 }
-                catch(InterruptedException | SQLException e){
+                catch(InterruptedException | SQLException | JsonProcessingException e){
                     System.out.println("Error: " + e.getMessage());
                 }
+                finally{
+                    listen=false;
+                }
         });
+        this.listen=true;
+        listenThread.setDaemon(true);
+        listenThread.start();
     }
     
     
@@ -308,6 +328,17 @@ public class DAO {
     
     
     
-    
+public void closeAll(){
+    listen=false;
+
+    try{
+        if(con != null && !con.isClosed()){
+            con.close();
+        }
+    }
+    catch(SQLException e){
+        e.printStackTrace();
+    }
+}
     
 }
