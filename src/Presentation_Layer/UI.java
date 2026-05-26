@@ -321,6 +321,7 @@ public class UI extends javax.swing.JFrame {
             this.table_inUse=true;
             this.resetBtn.setEnabled(table_inUse);
             Tcheck();
+            Table.setAutoCreateRowSorter(false);
         
     } catch (Exception e){
         System.out.println("LoadTable error");

@@ -463,17 +463,34 @@ DECLARE
     format_part TEXT;
     values_arr TEXT[];
     cleaned_values TEXT;
+    used_count INT;
 BEGIN
 
-    
+
+    EXECUTE format(
+        'SELECT COUNT(*) FROM %I WHERE %I = $1',
+        p_table_name,
+        p_column_name
+    )
+    INTO used_count
+    USING p_value;
+
+    IF used_count > 0 THEN
+        RAISE EXCEPTION
+            'Cannot remove fixed value "%" because it is used in % row(s)',
+            p_value,
+            used_count;
+    END IF;
+
+
     SELECT pgd.description
     INTO current_comment
     FROM pg_catalog.pg_statio_all_tables st
     JOIN pg_catalog.pg_description pgd
         ON pgd.objoid = st.relid
     JOIN information_schema.columns c
-        ON c.ordinal_position = pgd.objsubid
-       AND c.table_name = st.relname
+        ON c.table_name = st.relname
+       AND c.ordinal_position = pgd.objsubid
     WHERE c.table_name = p_table_name
       AND c.column_name = p_column_name;
 
@@ -481,7 +498,7 @@ BEGIN
         RETURN;
     END IF;
 
-    
+
     fixed_part := substring(current_comment FROM 'FIXED:([^|]+)');
     format_part := substring(current_comment FROM 'FORMAT:([^|]+)');
 
@@ -489,28 +506,26 @@ BEGIN
         RETURN;
     END IF;
 
-    
+
     values_arr := string_to_array(fixed_part, ',');
 
-    
     values_arr := ARRAY(
         SELECT trim(v)
         FROM unnest(values_arr) v
-        WHERE trim(v) <> p_value
+        WHERE trim(v) IS DISTINCT FROM p_value
     );
 
-    
+
     IF array_length(values_arr, 1) IS NULL THEN
         fixed_part := 'NONE';
     ELSE
         fixed_part := array_to_string(values_arr, ',');
     END IF;
 
-    
+
     current_comment := 'FIXED:' || fixed_part || '|FORMAT:' ||
         COALESCE(format_part, 'NONE');
 
-    
     EXECUTE format(
         'COMMENT ON COLUMN %I.%I IS %L',
         p_table_name,

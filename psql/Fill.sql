@@ -1,6 +1,8 @@
--- =========================
--- customers
--- =========================
+-- =====================================================================
+-- ARCHIVO: Fill.sql
+-- TODOS LOS ROLES CORREGIDOS PARA CUMPLIR CON LAS REGLAS DEL PROYECTO
+-- =====================================================================
+
 INSERT INTO customers (first_name, last_name, address, phone, email) VALUES
 ('Juan', 'Perez', 'Av. Central 101', '555-1001', 'juan.perez@email.com'),
 ('Maria', 'Lopez', 'Calle Norte 22', '555-1002', 'maria.lopez@email.com'),
@@ -14,7 +16,7 @@ INSERT INTO customers (first_name, last_name, address, phone, email) VALUES
 ('Elena', 'Castro', 'Av. Sol 111', '555-1010', 'elena.castro@email.com');
 
 -- =========================
--- staff
+-- staff (ROLES AJUSTADOS A TU REGLA FIXED:...)
 -- =========================
 INSERT INTO staff (first_name, last_name, role_staff, birth_date, address, phone, email) VALUES
 ('Roberto', 'Jimenez', 'Manager', '1985-03-15', 'Av. Uno 10', '555-2001', 'roberto.jimenez@email.com'),
@@ -24,9 +26,9 @@ INSERT INTO staff (first_name, last_name, role_staff, birth_date, address, phone
 ('Jorge', 'Navarro', 'Assistant Manager', '1995-07-12', 'Calle Cinco 50', '555-2005', 'jorge.navarro@email.com'),
 ('Diana', 'Flores', 'Cashier', '1993-09-17', 'Av. Seis 60', '555-2006', 'diana.flores@email.com'),
 ('Ricardo', 'Mendoza', 'Sales Associate', '1987-12-01', 'Calle Siete 70', '555-2007', 'ricardo.mendoza@email.com'),
-('Monica', 'Rojas', 'Accountant', '1991-08-08', 'Av. Ocho 80', '555-2008', 'monica.rojas@email.com'),
-('Daniel', 'Silva', 'Security', '1984-05-22', 'Calle Nueve 90', '555-2009', 'daniel.silva@email.com'),
-('Gabriela', 'Ortega', 'Assistant', '1996-04-14', 'Av. Diez 100', '555-2010', 'gabriela.ortega@email.com');
+('Monica', 'Rojas', 'Manager', '1991-08-08', 'Av. Ocho 80', '555-2008', 'monica.rojas@email.com'),
+('Daniel', 'Silva', 'Inventory Manager', '1984-05-22', 'Calle Nueve 90', '555-2009', 'daniel.silva@email.com'),
+('Gabriela', 'Ortega', 'Assistant Manager', '1996-04-14', 'Av. Diez 100', '555-2010', 'gabriela.ortega@email.com');
 
 -- =========================
 -- sales_outlets
@@ -92,7 +94,6 @@ VALUES
 
 -- =========================
 -- transaction_products
--- (SAFE: all stock quantities guaranteed sufficient)
 -- =========================
 INSERT INTO transaction_products (transaction_id, product_id, quantity) VALUES
 (1, 1, 1),
