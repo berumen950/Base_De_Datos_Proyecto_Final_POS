@@ -62,15 +62,23 @@ public class DAO {
                     boolean fixed=false;
                     List<String> values = new ArrayList<>();
                     String name = col.get("name").asText();
-                    int typeOid = col.get("type_oid").intValue();
-                        type = switch (typeOid) {
-                        case 21, 23, 20 -> Tag.NUMERICAL;                    
-                        case 700, 701, 1700 -> Tag.NUMERICAL_PRECISION;      
-                        case 25, 1042, 1043 -> Tag.STRING;                   
-                        case 1114 -> Tag.DATETIME;                           
-                        case 1082, 1083 -> Tag.DATE;                         
-                        case 16 -> Tag.BOOLEAN;                              
-                        default -> Tag.DEFAULT;
+                    Object oidObj = col.get("type_oid");
+                    int typeOid;
+                    if(oidObj instanceof Number n){
+                        typeOid = n.intValue();
+                    }
+                    else{
+                        String oid = col.get("type_oid").toString().replace("\"", "");
+                        typeOid = Integer.parseInt(oid);
+                    }
+                    type = switch (typeOid) {
+                    case 21, 23, 20 -> Tag.NUMERICAL;                    
+                    case 700, 701, 1700 -> Tag.NUMERICAL_PRECISION;      
+                    case 25, 1042, 1043 -> Tag.STRING;                   
+                    case 1114 -> Tag.DATETIME;                           
+                    case 1082, 1083 -> Tag.DATE;                         
+                    case 16 -> Tag.BOOLEAN;                              
+                    default -> Tag.DEFAULT;
                     };
                     Boolean nullable = col.get("nullable").asBoolean();
                     String data = col.path("comment").isNull() ? null : col.path("comment").asText();
@@ -130,6 +138,7 @@ public class DAO {
     }
     
     public void consult(DefaultTableModel model,String name,String filter){
+        model.setRowCount(0);
         PreparedStatement query;
         try{
             if(filter.isBlank()){
@@ -154,6 +163,12 @@ public class DAO {
             rs.close();
             query.close();
         } catch (Exception e){
+            try{
+            con.rollback();
+            } catch (SQLException rollbackError){
+                rollbackError.printStackTrace();
+            }
+            e.printStackTrace();
             System.out.println("Error at consult");
             System.out.println("Error: " + e.getMessage());
         }
@@ -268,12 +283,12 @@ public class DAO {
     
     
     public void actionSP(String sql) throws Exception{
-        PreparedStatement query;
+        Statement st;
         try{
-            query=con.prepareStatement(sql);
-            query.executeUpdate();
+            st=con.createStatement();
+            st.execute(sql);
             con.commit();
-            query.close();
+            st.close();
         }
         catch(SQLException e){
 
@@ -283,7 +298,7 @@ public class DAO {
             catch(SQLException ex){
                 ex.printStackTrace();
             }
-
+            e.printStackTrace();
             throw e;
         }
     }
@@ -300,10 +315,14 @@ public class DAO {
 
                         if(notifications != null){
                             for(PGNotification n: notifications){
-                                LowStockEvent event =
-                                mapper.readValue(n.getParameter(), LowStockEvent.class);
+                                String payload = n.getParameter();
+                                System.out.println(payload);
+                                if(payload != null && !payload.isBlank()){
+                                    LowStockEvent event =
+                                        mapper.readValue(payload, LowStockEvent.class);
 
-                                receiver.accept(event);
+                                    receiver.accept(event);
+                                }
                             }
                         }
                         Thread.sleep(1000);
@@ -311,6 +330,7 @@ public class DAO {
                 }
                 catch(InterruptedException | SQLException | JsonProcessingException e){
                     System.out.println("Error: " + e.getMessage());
+                    e.printStackTrace();
                 }
                 finally{
                     listen=false;

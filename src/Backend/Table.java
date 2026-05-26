@@ -79,4 +79,7 @@ public class Table {
     public IndexMap<String,Col> getColList(){
         return this.columns;
     }
+    public Col getCol(String colName){
+        return this.columns.get(colName);
+    }
 }

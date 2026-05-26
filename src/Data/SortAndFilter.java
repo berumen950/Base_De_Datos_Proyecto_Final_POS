@@ -45,5 +45,8 @@ public class SortAndFilter {
     public void removeArguments(int index){
         this.arguments.remove(index);
     }
+    public String getArg (int index){
+        return this.arguments.get(index);
+    }
     
 }

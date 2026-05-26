@@ -13,8 +13,8 @@ public enum Tag {
     NUMERICAL(List.of("EQUAL","GREATER","LESSER","GRTEQ","LESEQ","NEQUAL")),
     NUMERICAL_PRECISION(List.of("EQUAL","GREATER","LESSER","GRTEQ","LESEQ","NEQUAL")),
     STRING(List.of("EQUAL","NEQUAL","LIKE","ILIKE","NLIKE","NILIKE")),
-    DATETIME(List.of("EQUAL","GREATER","LESSER","GRTEQ","LESEQ","NEQUAL","BETWEEN")),
-    DATE(List.of("EQUAL","GREATER","LESSER","GRTEQ","LESEQ","NEQUAL","BETWEEN")),
+    DATETIME(List.of("EQUAL","GREATER","LESSER","GRTEQ","LESEQ","NEQUAL")),
+    DATE(List.of("EQUAL","GREATER","LESSER","GRTEQ","LESEQ","NEQUAL")),
     BOOLEAN(List.of("DEFAULT","NOT")),
     DEFAULT(List.of());
     private final List<String> operators;

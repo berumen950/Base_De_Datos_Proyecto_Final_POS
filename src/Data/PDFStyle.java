@@ -12,11 +12,11 @@ import java.awt.Font;
 public class PDFStyle {
     private String title;
     private int titleTextSize;
-    private Font titleFont;
+    private String titleFont;
     private boolean boldTitle;
     private boolean italicTitle;
     private Color titleColor;
-    private Font textFont;
+    private String textFont;
     private int textSize;
     private boolean boldText;
     private boolean italicText;
@@ -24,8 +24,8 @@ public class PDFStyle {
     public PDFStyle(){
         
     }
-    public PDFStyle(String title, int titleTextSize, Font titleFont, boolean boldTitle, boolean italicTitle,Color titleColor,
-                    Font textFont, int textSize, boolean boldText, boolean italicText) {
+    public PDFStyle(String title, int titleTextSize, String titleFont, boolean boldTitle, boolean italicTitle,Color titleColor,
+                    String textFont, int textSize, boolean boldText, boolean italicText) {
         this.title = title;
         this.titleTextSize = titleTextSize;
         this.titleFont = titleFont;
@@ -54,11 +54,11 @@ public class PDFStyle {
         this.titleTextSize = titleTextSize;
     }
 
-    public Font getTitleFont() {
+    public String getTitleFont() {
         return titleFont;
     }
 
-    public void setTitleFont(Font titleFont) {
+    public void setTitleFont(String titleFont) {
         this.titleFont = titleFont;
     }
 
@@ -86,11 +86,11 @@ public class PDFStyle {
         this.titleColor=newColor;
     }
     
-    public Font getTextFont(){
+    public String getTextFont(){
         return textFont;
     }
 
-    public void setTextFont(Font textFont) {
+    public void setTextFont(String textFont) {
         this.textFont = textFont;
     }
 

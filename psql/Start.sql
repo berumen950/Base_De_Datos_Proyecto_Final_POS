@@ -1,4 +1,4 @@
--- Porfavor usar \c ProjectDB o ejecutar en DB correcto.
+-- Porfavor usar en terminal o ejecutar en DB correcto.
 
 --Pasos a seguir
 
@@ -8,17 +8,13 @@
 --WITH LOGIN
 --PASSWORD 'admin123';
 
---CREATE DATABASE ProjectDB;
+--CREATE DATABASE 'ProjectDB';
 --GRANT ALL PRIVILEGES ON DATABASE ProjectDB TO admin;
-CREATE ROLE admin
-WITH LOGIN
-PASSWORD 'admin123';
 
-CREATE DATABASE ProjectDB;
 
-GRANT ALL PRIVILEGES ON DATABASE ProjectDB TO admin;
 
-\c ProjectDB
+
+
 
 GRANT ALL PRIVILEGES ON SCHEMA public TO admin;
 
@@ -406,37 +402,115 @@ DECLARE
     format_part TEXT;
 BEGIN
 
+    
     SELECT pgd.description
     INTO current_comment
     FROM pg_catalog.pg_statio_all_tables st
     JOIN pg_catalog.pg_description pgd
-      ON pgd.objoid = st.relid
+        ON pgd.objoid = st.relid
     JOIN information_schema.columns c
-      ON c.ordinal_position = pgd.objsubid
-     AND c.table_name = st.relname
+        ON c.table_name = st.relname
+       AND c.ordinal_position = pgd.objsubid
     WHERE c.table_name = p_table_name
-      AND c.column_name = p_column_name;
+      AND c.column_name = p_column_name
+    LIMIT 1;
 
     
+    current_comment := COALESCE(current_comment, 'FIXED:NONE|FORMAT:NONE');
+
+   
     fixed_part := substring(current_comment FROM 'FIXED:([^|]+)');
-    
-    
     format_part := substring(current_comment FROM 'FORMAT:([^|]+)');
 
-    
-    IF fixed_part = 'NONE' OR fixed_part IS NULL THEN
+    fixed_part := COALESCE(fixed_part, 'NONE');
+    format_part := COALESCE(format_part, 'NONE');
+
+   
+    IF fixed_part = 'NONE' THEN
         fixed_part := p_new_value;
     ELSE
         fixed_part := fixed_part || ',' || p_new_value;
     END IF;
 
     
-    IF format_part IS NOT NULL THEN
-        current_comment := 'FIXED:' || fixed_part || '|FORMAT:' || format_part;
-    ELSE
-        current_comment := 'FIXED:' || fixed_part || '|FORMAT:NONE';
+    current_comment :=
+        'FIXED:' || fixed_part ||
+        '|FORMAT:' || format_part;
+
+    
+    EXECUTE format(
+        'COMMENT ON COLUMN %I.%I IS %L',
+        p_table_name,
+        p_column_name,
+        current_comment
+    );
+
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION remove_fixed_value(
+    p_table_name TEXT,
+    p_column_name TEXT,
+    p_value TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+AS
+$$
+DECLARE
+    current_comment TEXT;
+    fixed_part TEXT;
+    format_part TEXT;
+    values_arr TEXT[];
+    cleaned_values TEXT;
+BEGIN
+
+    
+    SELECT pgd.description
+    INTO current_comment
+    FROM pg_catalog.pg_statio_all_tables st
+    JOIN pg_catalog.pg_description pgd
+        ON pgd.objoid = st.relid
+    JOIN information_schema.columns c
+        ON c.ordinal_position = pgd.objsubid
+       AND c.table_name = st.relname
+    WHERE c.table_name = p_table_name
+      AND c.column_name = p_column_name;
+
+    IF current_comment IS NULL THEN
+        RETURN;
     END IF;
 
+    
+    fixed_part := substring(current_comment FROM 'FIXED:([^|]+)');
+    format_part := substring(current_comment FROM 'FORMAT:([^|]+)');
+
+    IF fixed_part IS NULL OR fixed_part = 'NONE' THEN
+        RETURN;
+    END IF;
+
+    
+    values_arr := string_to_array(fixed_part, ',');
+
+    
+    values_arr := ARRAY(
+        SELECT trim(v)
+        FROM unnest(values_arr) v
+        WHERE trim(v) <> p_value
+    );
+
+    
+    IF array_length(values_arr, 1) IS NULL THEN
+        fixed_part := 'NONE';
+    ELSE
+        fixed_part := array_to_string(values_arr, ',');
+    END IF;
+
+    
+    current_comment := 'FIXED:' || fixed_part || '|FORMAT:' ||
+        COALESCE(format_part, 'NONE');
+
+    
     EXECUTE format(
         'COMMENT ON COLUMN %I.%I IS %L',
         p_table_name,
@@ -449,34 +523,33 @@ $$;
 
 
 
+DROP TRIGGER IF EXISTS trg_lowStock ON products;
+DROP FUNCTION IF EXISTS low_stock_trigger();
 
-
-CREATE OR REPLACE FUNCTION low_stock_trigger()
+CREATE FUNCTION low_stock_trigger()
 RETURNS TRIGGER
 LANGUAGE plpgsql
-AS
-$$
+AS $$
 BEGIN
-	IF NEW.stock <=10 THEN
-	
-		 PERFORM pg_notify(
+    IF NEW.stock <= 10 THEN
+        PERFORM pg_notify(
             'low_stock_channel',
-            'Low stock for product: ' ||
-            NEW.name ||
-            ' Stock: ' ||
-            NEW.stock
+            json_build_object(
+                'name', NEW.name,
+                'stock', NEW.stock
+            )::text
         );
+    END IF;
 
-	END IF;
-
-	RETURN NEW;
-
+    RETURN NEW;
 END;
 $$;
 
 CREATE TRIGGER trg_lowStock
 AFTER UPDATE OF stock
-ON products FOR EACH ROW EXECUTE FUNCTION low_stock_trigger();
+ON products
+FOR EACH ROW
+EXECUTE FUNCTION low_stock_trigger();
 
 
 
@@ -590,3 +663,17 @@ GRANT ALL ON TABLES TO admin;
 
 ALTER DEFAULT PRIVILEGES
 GRANT ALL ON SEQUENCES TO admin;  
+
+ALTER DATABASE "ProjectDB" OWNER TO admin;
+
+
+
+ALTER SCHEMA public OWNER TO admin;
+ALTER TABLE customers OWNER TO admin;
+ALTER TABLE staff OWNER TO admin;
+ALTER TABLE sales_outlets OWNER TO admin;
+ALTER TABLE payment_methods OWNER TO admin;
+ALTER TABLE products OWNER TO admin;
+ALTER TABLE sales_transactions OWNER TO admin;
+ALTER TABLE transaction_products OWNER TO admin;
+ALTER TABLE payments OWNER TO admin;

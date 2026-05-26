@@ -24,11 +24,12 @@ public class Col {
         this.name=name;
         this.type=type;
         this.is_fixed=is_fixed;
-        if(is_fixed){
-            this.values=values;
-        }
-        else{
-            this.values=null;
+        if (is_fixed) {
+            this.values = (values != null)
+                ? new ArrayList<>(values)
+                : new ArrayList<>();
+        } else {
+            this.values = null;
         }
         this.is_nullable=is_nullable;
         this.format=format;
@@ -68,11 +69,15 @@ public class Col {
     public void setValues(ArrayList<String> NewValues){
         this.values=NewValues;
     }
-    public void addValues(String value){
+    public void addValue(String value){
         this.values.add(value);
     }
     public List<String> getValues(){
         return this.values;
+    }
+    public void removeValue(String value){
+        if (this.values == null || value == null) return;
+        this.values.remove(value);
     }
     public String getValue(int index){
         return this.values.get(index);

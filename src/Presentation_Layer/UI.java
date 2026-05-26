@@ -9,6 +9,7 @@ package Presentation_Layer;
  * @author emimo
  */
 
+import Backend.*;
 import Data.SortAndFilter;
 import Data.*;
 import java.awt.*;
@@ -33,10 +34,11 @@ public class UI extends javax.swing.JFrame {
     private Backend.Table tableObj;
     private String filterInput="";
     private boolean UIloading=true;
+    private boolean SFUIloading=true;
     private String filterSQLSF="";
     private JComponent inputSF;
     private Map<String,LinkedHashMap<String,SortAndFilter>> listSF = new HashMap<>();
-    private String currentSF = null;
+    private String currentSF = "";
     private DefaultTableModel SFmodel = new DefaultTableModel();
     private DefaultTableModel model = new DefaultTableModel(){
         @Override
@@ -69,6 +71,10 @@ public class UI extends javax.swing.JFrame {
                 }
             }
         }
+        @Override
+        public boolean isCellEditable(int row, int col) {
+            return false;
+        }
     };
     private class CustomRenderer extends DefaultTableCellRenderer{
         
@@ -76,8 +82,8 @@ public class UI extends javax.swing.JFrame {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int col){
             super.getTableCellRendererComponent(table,value,isSelected,hasFocus,row,col);
-            
-            if((boolean)tableObj.getColData(col, "PRIMARY")){
+            int modelCol = table.convertColumnIndexToModel(col);
+            if((boolean)tableObj.getColData(modelCol, "PRIMARY")){
                 setForeground(Color.white);
                 setBackground(Color.getHSBColor(TOP_ALIGNMENT, TOP_ALIGNMENT, TOP_ALIGNMENT));
                 setBorder(customBorder);
@@ -99,13 +105,14 @@ public class UI extends javax.swing.JFrame {
     private boolean loaded=false;
     private boolean table_inUse=false;
     private Color titleColor=Color.BLACK;
+    private PDFgen pdf = new PDFgen();
     
     /**
      * Creates new form UI
      */
     public UI() {
         initComponents();
-        model = (DefaultTableModel) Table.getModel();
+        Table.setModel(model);
         search = new TableRowSorter<>(model);
         Table.setRowSorter(search);
         SFmodel = (DefaultTableModel) SFTable.getModel();
@@ -117,8 +124,10 @@ public class UI extends javax.swing.JFrame {
         titleSizeSpinnor.setModel(new SpinnerNumberModel(24,12,84,1));
         this.inputPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         this.SFbarPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
+        pdf.genFonts();
         access.start(tableSelect);
         loaded=true;
+        UIloading = false;
     }
     
     public abstract class SimpleDocListener implements DocumentListener{
@@ -152,13 +161,20 @@ public class UI extends javax.swing.JFrame {
         try{
         this.selected_table=this.tableSelect.getSelectedItem().toString();
         tableObj = access.fetch(selected_table);
+        currentSF="";
+        filterInput="";
+        filterSQLSF="";
+        clearSF();
         model.setRowCount(0);
         model.setColumnCount(0);
+        fields.clear();
+        rowData.clear();
         this.inputPanel.removeAll();
         this.colSelect.removeAllItems();
         this.colSFSelector.removeAllItems();
         this.colSortSelector.removeAllItems();
         this.colAddSelect.removeAllItems();
+        this.fixedListSelect.removeAllItems();
         for(Map.Entry<String,Backend.Col> entry: tableObj.getColList().entrySet()){
             Backend.Col c = entry.getValue();
             this.colSelect.addItem(c.getName());
@@ -176,6 +192,7 @@ public class UI extends javax.swing.JFrame {
             JPanel cell = new JPanel();
             cell.setLayout(new BoxLayout(cell,BoxLayout.Y_AXIS));
             cell.add(new JLabel(c.getName()));
+            cell.setOpaque(false);
             if(!c.getIncrementState()){
                 if(c.getState()){
                     JComboBox<String> box = new JComboBox<>(c.getValues().toArray(String[]::new));
@@ -295,14 +312,15 @@ public class UI extends javax.swing.JFrame {
                 });
                 fields.put(c.getName(), autoKey);
                 cell.add(autoKey);
+                inputPanel.add(cell);
             }
-            
-            
+        }
+            inputPanel.revalidate();
+            inputPanel.repaint();
             access.consult(model, selected_table,filterSQLSF);
             this.table_inUse=true;
             this.resetBtn.setEnabled(table_inUse);
             Tcheck();
-        }
         
     } catch (Exception e){
         System.out.println("LoadTable error");
@@ -316,7 +334,6 @@ public class UI extends javax.swing.JFrame {
     
     public void search(){
         String searchTxt = searchBar.getText();
-        Tag search_tag = tableObj.getColList().get(colSelect.getSelectedItem().toString()).getType();
         int col=Table.getColumnModel().getColumnIndex(colSelect.getSelectedItem().toString());
         
         if(searchTxt == null || searchTxt.trim().isEmpty()){
@@ -329,16 +346,31 @@ public class UI extends javax.swing.JFrame {
     
     
     public void getData(int row){
+        int col=-1;
        for(Map.Entry<String,JComponent> entry: this.fields.entrySet()){
-           int col=Table.getColumnModel().getColumnIndex(entry.getKey());
-           if(entry.getValue() instanceof JTextField textfield){
+             System.out.println("Looking for: " + entry.getKey());
+
+             for(int i=0;i<Table.getColumnCount();i++){
+                 System.out.println(
+                     "Column " + i + ": " + Table.getColumnName(i)
+                 );
+             }
+           try{
+                col = Table.getColumnModel().getColumnIndex(entry.getKey());
+                Object value=model.getValueAt(row,col);
+                if(value==null) continue;
+            }
+            catch(IllegalArgumentException e){
+                continue;
+            }
+           if(entry.getValue() instanceof JFormattedTextField txt){
+               txt.setValue(model.getValueAt(row, col));
+           }
+           else if(entry.getValue() instanceof JTextField textfield){
                textfield.setText(model.getValueAt(row, col).toString());
            }
            else if(entry.getValue() instanceof JComboBox combo){
                combo.setSelectedItem(model.getValueAt(row, col).toString());
-           }
-           else if(entry.getValue() instanceof JFormattedTextField txt){
-               txt.setValue(model.getValueAt(row, col));
            }
            else if(entry.getValue() instanceof JCheckBox check){
                try{
@@ -355,11 +387,11 @@ public class UI extends javax.swing.JFrame {
     
     public void clearData(){
         for(Map.Entry<String,JComponent> entry: this.fields.entrySet()){
-            if(entry.getValue() instanceof JTextField txt){
-                txt.setText("");
-            }
-            else if(entry.getValue() instanceof JFormattedTextField ftxt){
+            if(entry.getValue() instanceof JFormattedTextField ftxt){
                 ftxt.setValue(null);
+            }
+            else if(entry.getValue() instanceof JTextField txt){
+                txt.setText("");
             }
             else if(entry.getValue() instanceof JComboBox box){
                 box.setSelectedIndex(0);
@@ -379,11 +411,19 @@ public class UI extends javax.swing.JFrame {
             opType=tableObj.getColList().get(colSFSelector.getSelectedItem().toString()).getType();
             String format = tableObj.getColList().get(colSFSelector.getSelectedItem().toString()).getFormat();
             this.SFbarPanel.removeAll();
+            System.out.println("State: " + fixed);
             if(!fixed){
                 operatorSelect.removeAllItems();
-                for(String s: opType.getOperators()){
-                    operatorSelect.addItem(s);
+                System.out.println("OpTAG: " +opType);
+                System.out.println("Op: " + opType.getOperators() );
+                if(opType.getOperators() != null){
+                    for(String s : opType.getOperators()){
+                        System.out.println("Adding: " + s);
+                        operatorSelect.addItem(s);
+                    }
                 }
+                operatorSelect.revalidate();
+                operatorSelect.repaint();
                 switch(format){
                     case "NONE" -> {
                                 JTextField input = new JTextField();
@@ -477,10 +517,26 @@ public class UI extends javax.swing.JFrame {
                                 inputSF = input;
                             }
                 }
-
+                
             }
+            else{
+                JComboBox<String> box = new JComboBox<>(tableObj.getColList().get(colSFSelector.getSelectedItem().toString()).getValues().toArray(String[]::new));
+                    box.addActionListener(e ->{
+                        filterInput=box.getSelectedItem().toString();
+                    });
+                    SFbarPanel.add(box);
+                    inputSF = box;
+            }
+                Dimension inputSize = new Dimension(160, 25);
+                inputSF.setPreferredSize(inputSize);
+                inputSF.setMinimumSize(inputSize);
+                inputSF.setMaximumSize(inputSize);
+                SFbarPanel.revalidate();
+                SFbarPanel.repaint();
         }
     }
+    
+    
     public void create(){
         if(this.rowData.isEmpty()){
             JOptionPane.showMessageDialog(this,"Error, la informacion no puede estar vacia");
@@ -490,11 +546,21 @@ public class UI extends javax.swing.JFrame {
         for(Map.Entry<String,Backend.Col> entry : tableObj.getColList().entrySet()){
             Backend.Col c = entry.getValue();
             if(!c.getIncrementState()){
-                arg.put(c.getName(), new ValueTag(rowData.get(c.getName()),c.getType()));
+                Object value = rowData.get(c.getName());
+                if(value != null){
+                    arg.put(
+                        c.getName(),
+                        new ValueTag(value,c.getType())
+                    );
+                }
             }
         }
         try{
             access.create(selected_table, arg);
+            access.consult(model, selected_table, filterSQLSF);
+            rowData.clear();
+            Table.clearSelection();
+            clearData();
         }
         catch(Exception e){
             String errorMSG="";
@@ -511,24 +577,41 @@ public class UI extends javax.swing.JFrame {
         }
     }
     public void update(){
-        if(rowData.isEmpty() && Table.getSelectedRow() == -1){
+        if(rowData.isEmpty() || Table.getSelectedRow() == -1){
         JOptionPane.showMessageDialog(this,"Error, la informacion no puede estar vacia y ocupa selecionar una fila.");
         return;
-    }
-    LinkedHashMap <String,ValueTag> arg = new LinkedHashMap<>();
-    LinkedHashMap <String,ValueTag> position = new LinkedHashMap<>();
-    for(Map.Entry<String,Backend.Col> entry : tableObj.getColList().entrySet()){
-        Backend.Col c = entry.getValue();
-        if(c.getPrKey()){
-            position.put(c.getName(),new ValueTag(rowData.get(c.getName()),c.getType()));
         }
-        else{
-            arg.put(c.getName(),new ValueTag(rowData.get(c.getName()),c.getType()));
+        LinkedHashMap <String,ValueTag> arg = new LinkedHashMap<>();
+        LinkedHashMap <String,ValueTag> position = new LinkedHashMap<>();
+        for(Map.Entry<String,Backend.Col> entry : tableObj.getColList().entrySet()){
+            Backend.Col c = entry.getValue();
+            Object value = rowData.get(c.getName());
+            if(c.getPrKey()){
+                    if(value == null){
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Error: Primary key missing -> " + c.getName()
+                        );
+                        return;
+                    }
+                    position.put(c.getName(),new ValueTag(value,c.getType()));
+            }
+            else{
+                if(value != null){
+                arg.put(
+                    c.getName(),
+                    new ValueTag(value,c.getType())
+                );
+                }
+            }
         }
-    }
-    try{
-            access.update(selected_table,arg,position);
-        }
+        try{
+                access.update(selected_table,arg,position);
+                access.consult(model, selected_table, filterSQLSF);
+                rowData.clear();
+                Table.clearSelection();
+                clearData();
+            }
         catch(Exception e){
             String errorMSG="";
             if(e instanceof PSQLException ePSQL){
@@ -543,8 +626,9 @@ public class UI extends javax.swing.JFrame {
             return;
         }
     }
+
     public void delete(){
-        if(rowData.isEmpty() && Table.getSelectedRow() == -1){
+        if(rowData.isEmpty() || Table.getSelectedRow() == -1){
             JOptionPane.showMessageDialog(this,"Error, la informacion no puede estar vacia y ocupa selecionar una fila.");
             return;
        }
@@ -552,11 +636,23 @@ public class UI extends javax.swing.JFrame {
        for(Map.Entry<String,Backend.Col> entry : tableObj.getColList().entrySet()){
             Backend.Col c = entry.getValue();
             if(c.getPrKey()){
-                position.put(c.getName(),new ValueTag(rowData.get(c.getName()),c.getType()));
+                Object value = rowData.get(c.getName());
+                if(value == null){
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Error: Primary key missing -> " + c.getName()
+                    );
+                    return;
+                }
+                position.put(c.getName(),new ValueTag(value,c.getType()));
             }
        }
        try{
             access.delete(selected_table,position);
+            access.consult(model, selected_table, filterSQLSF);
+            rowData.clear();
+            Table.clearSelection();
+            clearData();
         }
         catch(Exception e){
             String errorMSG="";
@@ -574,127 +670,317 @@ public class UI extends javax.swing.JFrame {
     }
     public void SFopen(){
         if(loaded && table_inUse){
+            this.SFUIloading=true;
             SFWindow.pack();
             SFWindow.setLocationRelativeTo(this);
             loadSFSelector();
             SFWindow.setVisible(true);
+            this.SFUIloading=false;
         }
     }
     public void addSF(){
         String sfCol = this.colSFSelector.getSelectedItem().toString();
         String sfOp = this.operatorSelect.getSelectedItem().toString();
         String sfCon = this.connectSelect.getSelectedItem().toString();
+        String processed_input = this.filterInput.replace(" ","(_)");
+        String tSFOp = translator(sfOp);
         this.SFmodel.addRow(new Object[]{
-            sfCol + " " + sfOp + " " + this.filterInput,
+            sfCol + " " + tSFOp + " " + processed_input,
             sfCon
         });
-        if(!currentSF.isBlank()){
-            this.listSF.get(selected_table).get(currentSF).addArgument(sfCol + " " + sfOp + " " + this.filterInput + " " + sfCon);
+        if(currentSF != null && !currentSF.isBlank()){
+            this.listSF.get(selected_table).get(currentSF).addArgument(sfCol + " " + tSFOp + " " + processed_input + " " + sfCon);
         }
+        clearDataSFT();
     }
     public void deleteSF(int sfRow) throws Exception{
-        if(sfRow>0){
+        if(sfRow>=0){
             SFmodel.removeRow(sfRow);
-            if(!currentSF.isBlank()){
+            if(currentSF != null && !currentSF.isBlank()){
                 this.listSF.get(selected_table).get(currentSF).removeArguments(sfRow);
             }
+            clearDataSFT();
         }
         else{
             throw new Exception("Error, porfavor selecione una fila.");
         }
     }
     public void updateSF(int sfRow) throws Exception{
-        if(sfRow>0){
+        if(sfRow>=0){
             String sfCol = this.colSFSelector.getSelectedItem().toString();
             String sfOp = this.operatorSelect.getSelectedItem().toString();
             String sfCon = this.connectSelect.getSelectedItem().toString();
-            SFmodel.setValueAt(sfCol + " " + sfOp + " " + this.filterInput, sfRow, 0);
+            String processed_input = this.filterInput.replace(" ","(_)");
+            String tSFOp = translator(sfOp);
+            SFmodel.setValueAt(sfCol + " " + tSFOp + " " + processed_input, sfRow, 0);
             SFmodel.setValueAt(sfCon,sfRow,1);
-            if(!currentSF.isBlank()){
-                this.listSF.get(selected_table).get(currentSF).updateArgument(sfRow,sfCol + " " + sfOp + " " + this.filterInput + " " + sfCon);
+            if(currentSF != null && !currentSF.isBlank()){
+                this.listSF.get(selected_table).get(currentSF).updateArgument(sfRow,sfCol + " " + tSFOp + " " + processed_input + " " + sfCon);
             }
+            clearDataSFT();
         }
         else{
             throw new Exception("Error, porfavor selecione una fila.");
         }
     }
-    public void getDataSFT(int sfRow){
-        String[] SFdata = SFmodel.getValueAt(sfRow,0).toString().split(" ");
+    
+    public String translator(String op){
+        switch(op){
+            case "EQUAL" ->{
+                return "=";
+            }
+            case "NEQUAL" ->{
+                return "!=";
+            }
+            case "GREATER" ->{
+                return ">";
+            }
+            case "LESSER" ->{
+                return "<";
+            }
+            case "GRTEQ" ->{
+                return ">=";
+            }
+            case "LESEQ" ->{
+                return "<=";
+            }
+            case "LIKE" ->{
+                return "LIKE";
+            }
+            case "ILIKE" ->{
+                return "ILIKE";
+            }
+            case "NLIKE" ->{
+                return "NOT LIKE";
+            }
+            case "NILIKE" ->{
+                return "NOT ILIKE";
+            }
+            case "DEFAULT" ->{
+                return "=";
+            }
+            case "NOT" ->{
+                return "NOT";
+            }
+            default ->{
+                return "=";
+            }
+        }
+    }
+    
+    public String invTranslator(String opSym) {
+        switch (opSym) {
+
+            case "=" -> {
+                return "EQUAL";
+            }
+
+            case "!=" -> {
+                return "NEQUAL";
+            }
+
+            case ">" -> {
+                return "GREATER";
+            }
+
+            case "<" -> {
+                return "LESSER";
+            }
+
+            case ">=" -> {
+                return "GRTEQ";
+            }
+
+            case "<=" -> {
+                return "LESEQ";
+            }
+
+            case "LIKE" -> {
+                return "LIKE";
+            }
+
+            case "ILIKE" -> {
+                return "ILIKE";
+            }
+
+            case "NOT LIKE" -> {
+                return "NLIKE";
+            }
+
+            case "NOT ILIKE" -> {
+                return "NILIKE";
+            }
+
+            case "NOT" -> {
+                return "NOT";
+            }
+
+            default -> {
+                return "EQUAL"; 
+            }
+        }
+    }
+    public void clearDataSFT(){
         if(this.inputSF instanceof JTextField textfield){
-            textfield.setText(SFdata[2]);
+            textfield.setText("");
         }
         else if(this.inputSF instanceof JComboBox combo){
-            combo.setSelectedItem(SFdata[2]);
+            combo.setSelectedItem("");
         }
         else if(this.inputSF instanceof JFormattedTextField txt){
-            txt.setValue(SFdata[2]);
+            txt.setValue("");
         }
         else if(this.inputSF instanceof JCheckBox check){
             try{
-            check.setSelected(Boolean.parseBoolean(SFdata[2]));
+            check.setSelected(Boolean.parseBoolean(""));
+            }
+            catch(Exception e){
+                JOptionPane.showMessageDialog(this,"Error, algo a salido mal en limpiar inputSF.");
+                e.printStackTrace();
+            }
+        }
+    }
+    public void getDataSFT(int sfRow) throws Exception{
+        String[] SFdata = SFmodel.getValueAt(sfRow,0).toString().split(" ");
+        if (SFdata.length < 3) {
+            throw new IllegalStateException("Corrupted SF row format");
+        }
+        String processed_data = SFdata[2].replace("(_)", " ");
+        if(this.inputSF instanceof JTextField textfield){
+            textfield.setText(processed_data);
+        }
+        else if(this.inputSF instanceof JComboBox combo){
+            combo.setSelectedItem(processed_data);
+        }
+        else if(this.inputSF instanceof JFormattedTextField txt){
+            txt.setValue(processed_data);
+        }
+        else if(this.inputSF instanceof JCheckBox check){
+            try{
+            check.setSelected(Boolean.parseBoolean(processed_data));
             }
             catch(Exception e){
                 JOptionPane.showMessageDialog(this,"Error, algo a salido mal en valor: " + SFdata[2]);
                 e.printStackTrace();
             }
         }
-        this.operatorSelect.setSelectedItem(SFdata[1]);
+        String iTOP = invTranslator(SFdata[1]);
+        this.operatorSelect.setSelectedItem(iTOP);
         this.colSFSelector.setSelectedItem(SFdata[0]);
         this.connectSelect.setSelectedItem(SFmodel.getValueAt(sfRow, 1).toString());
     }
     public void createSFTable(){
         String SFName = sfBar.getText();
-        if(!this.listSF.get(this.selected_table).isEmpty()){
-            for(Map.Entry<String,SortAndFilter> entry : this.listSF.get(this.selected_table).entrySet()){
-                String name = entry.getKey();
-                if(SFName.equals(name)){
-                    JOptionPane.showMessageDialog(this,"Error, no puedes tener poner un nombre en uso.");
-                    return;
-                }
-            }
+        if(this.listSF.get(selected_table) == null){
+            this.listSF.put(
+                selected_table,
+                new LinkedHashMap<>()
+            );
+        }
+        if(this.listSF.get(selected_table).containsKey(SFName)){
+            JOptionPane.showMessageDialog(
+                this,
+                "Error, no puedes poner un nombre en uso."
+            );
+            return;
         }
         ArrayList<String> arguments = new ArrayList<>();
         for (int row = 0; row < SFTable.getRowCount(); row++) {
             String arg = SFmodel.getValueAt(row, 0) + " " + SFmodel.getValueAt(row, 1);
             arguments.add(arg);
         }
-        LinkedHashMap<String, SortAndFilter> SF = new LinkedHashMap<>();
-        SF.put(SFName,new SortAndFilter(SFName,arguments,this.sortShowcasetxt.toString()));
-        this.listSF.put(this.selected_table,SF);
+        this.listSF.get(selected_table).put(SFName, new SortAndFilter(SFName,arguments,this.sortShowcasetxt.getText()));
         this.currentSF=SFName;
+        UIloading = true;
         loadSFSelector();
+        sfObjSelector.setSelectedItem(currentSF);
+        UIloading = false;
     }
     
     
     public void deleteSFTable(){
-        if(!currentSF.isBlank()){
-            this.listSF.get(this.selected_table).remove(currentSF);
+        if(currentSF != null && !currentSF.isBlank() && this.listSF.get(selected_table) != null){
+            this.listSF.get(selected_table).remove(currentSF);
+            currentSF="";
+            loadSFSelector();
         }
     }
     
     
     public void loadSFTable(){
+        if (selected_table == null) return;
         SFmodel.setRowCount(0);
-        SortAndFilter sf = this.listSF.get(this.selected_table).get(currentSF);
+        LinkedHashMap<String, SortAndFilter> map = listSF.get(selected_table);
+        if (map == null) return;
+
+        if (currentSF == null || currentSF.isBlank()) return;
+
+        SortAndFilter sf = map.get(currentSF);
+        if (sf == null) return;
         for(String row : sf.getArguments()){
-            String[] rowData = row.split(" ");
+            String[] rowData = row.split(" ",4);
             String args = rowData[0] + " " + rowData[1] + " " + rowData[2]; 
             SFmodel.addRow(new Object[]{
                 args,
                 rowData[3]
             });
         }
+        this.sortShowcasetxt.setText(sf.getSorter());
     }
     public void loadSFSelector(){
-        for(Map.Entry<String,SortAndFilter> entry : this.listSF.get(this.selected_table).entrySet()){
-            this.sfObjSelector.addItem(entry.getKey());
+        sfObjSelector.removeAllItems();
+        try{
+            LinkedHashMap<String,SortAndFilter> map =
+                this.listSF.get(this.selected_table);
+
+            if(map == null){
+                return;
+            }
+            for(Map.Entry<String,SortAndFilter> entry : this.listSF.get(this.selected_table).entrySet()){
+                this.sfObjSelector.addItem(entry.getKey());
+            }
+        } catch(Exception e){
+            e.printStackTrace();
         }
     }
-    public void applySF(){
-        SortAndFilter sf = this.listSF.get(this.selected_table).get(currentSF);
+    
+    public void applySF() throws Exception{
+        if(currentSF == null || currentSF.isBlank()){
+            return;
+        }
+        LinkedHashMap<String,SortAndFilter> map =this.listSF.get(selected_table);
+        if(map == null){
+            return;
+        }
+        SortAndFilter sf = map.get(currentSF);
+        if(sf == null){
+            return;
+        }
         StringBuilder sql = new StringBuilder();
-        for(String s : sf.getArguments()){
-           sql.append(s +" ");
+        for(int i = 0; i < sf.getArguments().size(); i++){
+            String s = sf.getArg(i);
+            String[] rowData = s.split(" ",4);
+            String pInputData = rowData[2].replaceAll("(_)", " ");
+            if(i!=0){
+                String as = sf.getArg(i-1);
+                String[] prowData = as.split(" ",4);
+                if(!prowData[3].equals("OR") && !prowData[3].equals("AND")){
+                    throw new Exception("Error, falta de connector en fila: " + i);
+                }  
+            }
+            if(i==sf.getArguments().size()-1){
+                if(rowData[3].equals("OR") || rowData[3].equals("AND")){
+                    throw new Exception("Error, conector extra en argumento final.");
+                }
+            }
+            sql.append(rowData[0])
+                .append(" ")
+                .append(rowData[1])
+                .append(" ")
+                .append(pInputData)
+                .append(" ")
+                .append(rowData[3])
+                .append(" ");
         }
         sql.append(sf.getSorter());
         filterSQLSF = sql.toString();
@@ -708,6 +994,13 @@ public class UI extends javax.swing.JFrame {
     
     public void Tcheck(){
         transactionBtn.setEnabled(loaded && "sales_transactions".equals(selected_table));
+    }
+    public void clearSF(){
+        this.currentSF="";
+        SFmodel.setRowCount(0);
+        clearDataSFT();
+        this.sortShowcasetxt.setText("");
+        this.sfBar.setText("");
     }
     
     @SuppressWarnings("unchecked")
@@ -736,12 +1029,12 @@ public class UI extends javax.swing.JFrame {
         sfDelete = new javax.swing.JButton();
         applyBtn = new javax.swing.JButton();
         unapplyBtn = new javax.swing.JButton();
+        sfClearBtn = new javax.swing.JButton();
         jScrollPane2 = new javax.swing.JScrollPane();
         SFTable = new javax.swing.JTable();
         jPanel10 = new javax.swing.JPanel();
         sortLabel = new javax.swing.JLabel();
         sortShowcasetxt = new javax.swing.JTextField();
-        jColorChooser1 = new javax.swing.JColorChooser();
         jTabbedPane1 = new javax.swing.JTabbedPane();
         jPanel1 = new javax.swing.JPanel();
         inputPanel = new javax.swing.JPanel();
@@ -786,6 +1079,8 @@ public class UI extends javax.swing.JFrame {
         addValueBtn = new javax.swing.JButton();
         valueBar = new javax.swing.JTextField();
         colAddSelect = new javax.swing.JComboBox<>();
+        fixedListSelect = new javax.swing.JComboBox<>();
+        eraseFixedBtn = new javax.swing.JButton();
         jPanel6 = new javax.swing.JPanel();
         transactionBtn = new javax.swing.JButton();
         lowStockTrigger = new javax.swing.JRadioButton();
@@ -794,29 +1089,39 @@ public class UI extends javax.swing.JFrame {
 
         jPanel7.setBackground(new java.awt.Color(0, 153, 204));
 
+        jPanel8.setOpaque(false);
+
         colSFSelector.addItemListener(this::Colshift);
 
         connectSelect.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "---", "AND", "OR" }));
 
         sortOperatorSelect.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "ASC", "DESC" }));
 
+        sMODIFY.setBackground(new java.awt.Color(102, 0, 102));
         sMODIFY.setText("SMODIFY");
         sMODIFY.addActionListener(this::sMODIFYActionPerformed);
 
+        fUpdateBtn.setBackground(new java.awt.Color(153, 0, 204));
         fUpdateBtn.setText("FUPDATE");
         fUpdateBtn.addActionListener(this::fUpdateBtnActionPerformed);
 
+        fDeleteBtn.setBackground(new java.awt.Color(255, 0, 0));
         fDeleteBtn.setText("FDELETE");
         fDeleteBtn.addActionListener(this::fDeleteBtnActionPerformed);
 
+        sDelete.setBackground(new java.awt.Color(255, 0, 0));
         sDelete.setText("SDELETE");
         sDelete.addActionListener(this::sDeleteActionPerformed);
 
+        fAddBtn.setBackground(new java.awt.Color(0, 153, 0));
         fAddBtn.setText("FADD");
         fAddBtn.addActionListener(this::fAddBtnActionPerformed);
 
         SFbarPanel.setMinimumSize(new java.awt.Dimension(64, 22));
+        SFbarPanel.setOpaque(false);
         SFbarPanel.setPreferredSize(new java.awt.Dimension(64, 22));
+
+        filterBar.addActionListener(this::filterBarActionPerformed);
 
         javax.swing.GroupLayout SFbarPanelLayout = new javax.swing.GroupLayout(SFbarPanel);
         SFbarPanel.setLayout(SFbarPanelLayout);
@@ -895,11 +1200,15 @@ public class UI extends javax.swing.JFrame {
                 .addGap(9, 9, 9))
         );
 
+        jPanel9.setOpaque(false);
+
         sfObjSelector.addItemListener(this::tableShiftSF);
 
+        sfCreateBtn.setBackground(new java.awt.Color(51, 255, 255));
         sfCreateBtn.setText("SFCREATE");
         sfCreateBtn.addActionListener(this::sfCreateBtnActionPerformed);
 
+        sfDelete.setBackground(new java.awt.Color(255, 0, 0));
         sfDelete.setText("SFDELETE");
         sfDelete.addActionListener(this::sfDeleteActionPerformed);
 
@@ -908,6 +1217,9 @@ public class UI extends javax.swing.JFrame {
 
         unapplyBtn.setText("Unapply");
         unapplyBtn.addActionListener(this::unapplyBtnActionPerformed);
+
+        sfClearBtn.setText("SFCLEAR");
+        sfClearBtn.addActionListener(this::sfClearBtnActionPerformed);
 
         javax.swing.GroupLayout jPanel9Layout = new javax.swing.GroupLayout(jPanel9);
         jPanel9.setLayout(jPanel9Layout);
@@ -920,11 +1232,13 @@ public class UI extends javax.swing.JFrame {
                 .addComponent(sfCreateBtn)
                 .addGap(18, 18, 18)
                 .addComponent(sfDelete)
-                .addGap(29, 29, 29)
+                .addGap(18, 18, 18)
+                .addComponent(sfClearBtn)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(sfObjSelector, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(applyBtn)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 24, Short.MAX_VALUE)
+                .addGap(18, 18, 18)
                 .addComponent(unapplyBtn)
                 .addContainerGap())
         );
@@ -938,7 +1252,8 @@ public class UI extends javax.swing.JFrame {
                     .addComponent(sfCreateBtn)
                     .addComponent(sfDelete)
                     .addComponent(applyBtn)
-                    .addComponent(unapplyBtn))
+                    .addComponent(unapplyBtn)
+                    .addComponent(sfClearBtn))
                 .addContainerGap(18, Short.MAX_VALUE))
         );
 
@@ -1024,7 +1339,7 @@ public class UI extends javax.swing.JFrame {
                         .addComponent(jPanel7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addContainerGap())))
             .addGroup(SFWindowLayout.createSequentialGroup()
-                .addComponent(jScrollPane2)
+                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 796, Short.MAX_VALUE)
                 .addContainerGap())
         );
         SFWindowLayout.setVerticalGroup(
@@ -1045,6 +1360,8 @@ public class UI extends javax.swing.JFrame {
 
         jPanel1.setBackground(new java.awt.Color(51, 153, 255));
 
+        inputPanel.setOpaque(false);
+
         javax.swing.GroupLayout inputPanelLayout = new javax.swing.GroupLayout(inputPanel);
         inputPanel.setLayout(inputPanelLayout);
         inputPanelLayout.setHorizontalGroup(
@@ -1058,18 +1375,23 @@ public class UI extends javax.swing.JFrame {
 
         btnPanel.setOpaque(false);
 
+        createBtn.setBackground(new java.awt.Color(0, 153, 0));
         createBtn.setText("Agregar");
         createBtn.addActionListener(this::createBtnActionPerformed);
 
+        updateBtn.setBackground(new java.awt.Color(153, 0, 204));
         updateBtn.setText("Actualizar");
         updateBtn.addActionListener(this::updateBtnActionPerformed);
 
+        clearBtn.setBackground(new java.awt.Color(0, 153, 153));
         clearBtn.setText("Clear");
         clearBtn.addActionListener(this::clearBtnActionPerformed);
 
+        deleteBtn.setBackground(new java.awt.Color(255, 0, 0));
         deleteBtn.setText("Delete");
         deleteBtn.addActionListener(this::deleteBtnActionPerformed);
 
+        sfMenuBtn.setBackground(new java.awt.Color(255, 255, 0));
         sfMenuBtn.setText("S&F");
         sfMenuBtn.addActionListener(this::sfMenuBtnActionPerformed);
 
@@ -1205,6 +1527,8 @@ public class UI extends javax.swing.JFrame {
 
         jPanel4.setBackground(new java.awt.Color(51, 153, 255));
 
+        jPanel11.setOpaque(false);
+
         jLabel2.setText("Fonts");
 
         jLabel3.setText("Text size");
@@ -1229,10 +1553,13 @@ public class UI extends javax.swing.JFrame {
         jSeparator2.setOrientation(javax.swing.SwingConstants.VERTICAL);
 
         pdfPreviewBtn.setText("Preview");
+        pdfPreviewBtn.addActionListener(this::pdfPreviewBtnActionPerformed);
 
         pdfExportBtn.setText("Export");
+        pdfExportBtn.addActionListener(this::pdfExportBtnActionPerformed);
 
         PDFgenBtn.setText("Generate");
+        PDFgenBtn.addActionListener(this::PDFgenBtnActionPerformed);
 
         javax.swing.GroupLayout jPanel11Layout = new javax.swing.GroupLayout(jPanel11);
         jPanel11.setLayout(jPanel11Layout);
@@ -1335,7 +1662,7 @@ public class UI extends javax.swing.JFrame {
                                     .addComponent(pdfPreviewBtn)
                                     .addComponent(pdfExportBtn)
                                     .addComponent(PDFgenBtn))))
-                        .addGap(0, 0, Short.MAX_VALUE)))
+                        .addGap(0, 8, Short.MAX_VALUE)))
                 .addContainerGap())
         );
 
@@ -1347,10 +1674,10 @@ public class UI extends javax.swing.JFrame {
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel4Layout.createSequentialGroup()
-                .addGap(24, 24, 24)
-                .addComponent(jPanel11, javax.swing.GroupLayout.PREFERRED_SIZE, 187, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(27, Short.MAX_VALUE))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel4Layout.createSequentialGroup()
+                .addContainerGap(24, Short.MAX_VALUE)
+                .addComponent(jPanel11, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(14, 14, 14))
         );
 
         jTabbedPane1.addTab("REPORTS", jPanel4);
@@ -1362,6 +1689,11 @@ public class UI extends javax.swing.JFrame {
         addValueBtn.setText("Add Value");
         addValueBtn.addActionListener(this::addFixedValue);
 
+        colAddSelect.addItemListener(this::valueShift);
+
+        eraseFixedBtn.setText("Erase Value");
+        eraseFixedBtn.addActionListener(this::eraseFixedBtnActionPerformed);
+
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
         jPanel2Layout.setHorizontalGroup(
@@ -1370,10 +1702,14 @@ public class UI extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addComponent(valueBar, javax.swing.GroupLayout.PREFERRED_SIZE, 197, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addGroup(jPanel2Layout.createSequentialGroup()
-                        .addComponent(addValueBtn)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
+                        .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(addValueBtn)
+                            .addComponent(fixedListSelect, javax.swing.GroupLayout.PREFERRED_SIZE, 84, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(colAddSelect, javax.swing.GroupLayout.PREFERRED_SIZE, 87, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                            .addComponent(colAddSelect, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(eraseFixedBtn, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
                 .addContainerGap(17, Short.MAX_VALUE))
         );
         jPanel2Layout.setVerticalGroup(
@@ -1385,6 +1721,10 @@ public class UI extends javax.swing.JFrame {
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(addValueBtn)
                     .addComponent(colAddSelect, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(18, 18, 18)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(eraseFixedBtn)
+                    .addComponent(fixedListSelect, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -1508,7 +1848,13 @@ public class UI extends javax.swing.JFrame {
     }//GEN-LAST:event_clearBtnActionPerformed
 
     private void TableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_TableMouseClicked
-        int row = Table.convertRowIndexToModel(Table.getSelectedRow());
+        int selected = Table.getSelectedRow();
+
+        if(selected == -1){
+            return;
+        }
+
+        int row = Table.convertRowIndexToModel(selected);
         getData(row);
     }//GEN-LAST:event_TableMouseClicked
 
@@ -1532,7 +1878,9 @@ public class UI extends javax.swing.JFrame {
         String sortOp = this.sortOperatorSelect.getSelectedItem().toString();
         String sortSQL= " ORDER BY " + colSort + " " + sortOp;
         this.sortShowcasetxt.setText(sortSQL);
-        this.listSF.get(this.selected_table).get(currentSF).setSorter(sortSQL);
+        if(currentSF !=null && !currentSF.isBlank()){
+            this.listSF.get(this.selected_table).get(currentSF).setSorter(sortSQL);
+        }
     }//GEN-LAST:event_sMODIFYActionPerformed
 
     private void fAddBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_fAddBtnActionPerformed
@@ -1540,7 +1888,11 @@ public class UI extends javax.swing.JFrame {
     }//GEN-LAST:event_fAddBtnActionPerformed
 
     private void applyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyBtnActionPerformed
-        applySF();
+        try{
+            applySF();
+        }catch(Exception e){
+            JOptionPane.showMessageDialog(this, "Error de SFApply: " + e.getMessage());
+        }
     }//GEN-LAST:event_applyBtnActionPerformed
 
     private void unapplyBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unapplyBtnActionPerformed
@@ -1557,10 +1909,13 @@ public class UI extends javax.swing.JFrame {
     }//GEN-LAST:event_searchBtnActionPerformed
 
     private void tableShiftSF(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_tableShiftSF
-        if (evt.getStateChange() != java.awt.event.ItemEvent.SELECTED) return;
-        currentSF=sfObjSelector.getSelectedItem().toString();
-        if(loaded && !currentSF.isBlank()){
-           loadSFTable(); 
+        if (UIloading) return;
+        if (evt.getStateChange() != ItemEvent.SELECTED) return;
+
+        currentSF = (String) evt.getItem(); 
+
+        if (loaded && currentSF != null && !currentSF.isBlank()) {
+            loadSFTable();
         }
     }//GEN-LAST:event_tableShiftSF
 
@@ -1594,26 +1949,38 @@ public class UI extends javax.swing.JFrame {
 
     private void sDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sDeleteActionPerformed
     this.sortShowcasetxt.setText("");
-    this.listSF.get(this.selected_table).get(currentSF).setSorter("");
+    if(currentSF !=null && !currentSF.isBlank()){
+        this.listSF.get(this.selected_table).get(currentSF).setSorter("");
+    }
     }//GEN-LAST:event_sDeleteActionPerformed
 
     private void interactSFTable(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_interactSFTable
         int sfRow = SFTable.convertRowIndexToModel(SFTable.getSelectedRow());
-        getDataSFT(sfRow);
+        try{
+            getDataSFT(sfRow);
+        }
+        catch(Exception e){
+            JOptionPane.showMessageDialog(this, "Error in getData: " + e.getMessage());
+        }
     }//GEN-LAST:event_interactSFTable
 
     private void addFixedValue(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addFixedValue
         String nfValue = this.valueBar.getText();
         String col = this.colAddSelect.getSelectedItem().toString();
-        if(nfValue.isBlank() && col.isBlank()){
+        if(nfValue.isBlank() || col.isBlank()){
             JOptionPane.showMessageDialog(this,"Error, ni el valor y la columna pueden estar vacios.");
             return;
         }
+        nfValue = nfValue.replace("'", "''");
         String addSQL = String.format("SELECT add_fixed_value('%s','%s','%s')",selected_table,col,nfValue);
         try{
             access.actionSP(addSQL);
+            tableObj.getCol(col).addValue(nfValue);
+            loadTable();
         }
         catch (Exception e){
+            System.out.println(e.getMessage() + "ERROR ERROR");
+            e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Error, desafortunadamente ha habido un error: " + e.getMessage());
             return;
         }
@@ -1628,16 +1995,20 @@ public class UI extends javax.swing.JFrame {
         for(Map.Entry<String,Backend.Col> entry : tableObj.getColList().entrySet()){
         Backend.Col c = entry.getValue();
             if(c.getPrKey()){
-                tID=rowData.get(c.getName()).toString();
+                Object value=rowData.get(c.getName());
+                if(value!=null){
+                    tID=value.toString();
+                }
             }
         }
-        if (tID == null) {
+        if (tID == null || tID.isBlank()) {
             JOptionPane.showMessageDialog(this, "No se encontró la PK.");
             return;
         }
         String tSQL = "SELECT fin_transaction(" + tID + ")";
         try{
             access.actionSP(tSQL);
+            access.consult(model,selected_table,filterSQLSF);
         }
         catch (Exception e){
             JOptionPane.showMessageDialog(this, "Error, desafortunadamente ha habido un error: " + e.getMessage());
@@ -1646,11 +2017,14 @@ public class UI extends javax.swing.JFrame {
     }//GEN-LAST:event_transactionSQL
 
     private void Activated(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_Activated
-    if (evt.getStateChange() != java.awt.event.ItemEvent.SELECTED) return;
+
     if (evt.getStateChange() == ItemEvent.SELECTED) {
         access.startListening(this::handleLowStockUI);
-    } else {
+    } else if (evt.getStateChange() == ItemEvent.DESELECTED){
         access.stopListening();
+    }
+    else{
+        return;
     }
     lowStockTrigger.setText(lowStockTrigger.isSelected()? "Low Stock: ON": "Low Stock: OFF");
     }//GEN-LAST:event_Activated
@@ -1658,7 +2032,80 @@ public class UI extends javax.swing.JFrame {
     private void colorChoice(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_colorChoice
         titleColor = JColorChooser.showDialog(this, "Pick Title Color",Color.BLACK);
     }//GEN-LAST:event_colorChoice
+
+    private void PDFgenBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_PDFgenBtnActionPerformed
+        String fontTitle = this.titleFontSel.getSelectedItem().toString();
+        String fontText = this.fontSel.getSelectedItem().toString();
+        int titleSize = (Integer) this.titleSizeSpinnor.getValue();
+        int textSize = (Integer) this.textSizeSpinnor.getValue();
+        String titleText =this.titleTxtInput.getText();
+        boolean textBold = this.boldOpt.isSelected();
+        boolean textItalic = this.italicOpt.isSelected();
+        boolean titleBold = this.boldTitleOpt.isSelected();
+        boolean titleItalic = this.italicTitleOpt.isSelected();
+        pdf.genStyle(titleText, titleSize, fontTitle, titleBold, titleItalic, titleColor, fontText, textSize, textBold, textItalic);
+        pdf.genModel(Table);
+    }//GEN-LAST:event_PDFgenBtnActionPerformed
+
+    private void pdfPreviewBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pdfPreviewBtnActionPerformed
+        pdf.previewPDF();
+    }//GEN-LAST:event_pdfPreviewBtnActionPerformed
+
+    private void pdfExportBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pdfExportBtnActionPerformed
+        pdf.export();
+    }//GEN-LAST:event_pdfExportBtnActionPerformed
+
+    private void valueShift(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_valueShift
+        if (evt.getStateChange() != java.awt.event.ItemEvent.SELECTED) return;
+        this.fixedListSelect.removeAllItems();
+        java.util.List<String> safe = new ArrayList<>(
+            this.tableObj
+                .getCol(this.colAddSelect.getSelectedItem().toString())
+                .getValues()
+        );
+
+        this.fixedListSelect.setModel(
+            new DefaultComboBoxModel<>(safe.toArray(new String[0]))
+        );
+    }//GEN-LAST:event_valueShift
+
+    private void eraseFixedBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_eraseFixedBtnActionPerformed
+
+        if (this.fixedListSelect.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, "No value selected.");
+            return;
+        }
+        String nfValue = this.fixedListSelect.getSelectedItem().toString();
+        String col = this.colAddSelect.getSelectedItem().toString();
+        if(nfValue.isBlank() || col.isBlank()){
+            JOptionPane.showMessageDialog(this,"Error, ni el valor y la columna pueden estar vacios.");
+            return;
+        }
+        nfValue = nfValue.replace("'", "''");
+        String removeSQL = String.format("SELECT remove_fixed_value('%s','%s','%s')",selected_table,col,nfValue);
+        try{
+            access.actionSP(removeSQL);
+            tableObj.getCol(col).removeValue(nfValue);
+            loadTable();
+        }
+        catch (Exception e){
+            System.out.println(e.getMessage() + "ERROR ERROR");
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error, desafortunadamente ha habido un error: " + e.getMessage());
+            return;
+        }
+    }//GEN-LAST:event_eraseFixedBtnActionPerformed
+
+    private void sfClearBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sfClearBtnActionPerformed
+        clearSF();
+    }//GEN-LAST:event_sfClearBtnActionPerformed
+
+    private void filterBarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_filterBarActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_filterBarActionPerformed
 private void handleLowStockUI(LowStockEvent event) {
+    System.out.println("USED: ");
+    System.out.println(event);
     SwingUtilities.invokeLater(() -> {
         JOptionPane.showMessageDialog(
             this,
@@ -1692,6 +2139,10 @@ private void handleLowStockUI(LowStockEvent event) {
         //</editor-fold>
 
         /* Create and display the form */
+        UIManager.put(
+        "FileChooser.useShellFolder",
+        Boolean.FALSE
+        );
         java.awt.EventQueue.invokeLater(() -> new UI().setVisible(true));
     }
 
@@ -1715,15 +2166,16 @@ private void handleLowStockUI(LowStockEvent event) {
     private javax.swing.JComboBox<String> connectSelect;
     private javax.swing.JButton createBtn;
     private javax.swing.JButton deleteBtn;
+    private javax.swing.JButton eraseFixedBtn;
     private javax.swing.JButton fAddBtn;
     private javax.swing.JButton fDeleteBtn;
     private javax.swing.JButton fUpdateBtn;
     private javax.swing.JTextField filterBar;
+    private javax.swing.JComboBox<String> fixedListSelect;
     private javax.swing.JComboBox<String> fontSel;
     private javax.swing.JPanel inputPanel;
     private javax.swing.JCheckBox italicOpt;
     private javax.swing.JCheckBox italicTitleOpt;
-    private javax.swing.JColorChooser jColorChooser1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
@@ -1756,6 +2208,7 @@ private void handleLowStockUI(LowStockEvent event) {
     private javax.swing.JTextField searchBar;
     private javax.swing.JButton searchBtn;
     private javax.swing.JTextField sfBar;
+    private javax.swing.JButton sfClearBtn;
     private javax.swing.JButton sfCreateBtn;
     private javax.swing.JButton sfDelete;
     private javax.swing.JButton sfMenuBtn;
