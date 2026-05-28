@@ -1356,6 +1356,11 @@ public class UI extends javax.swing.JFrame {
         );
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            public void windowClosing(java.awt.event.WindowEvent evt) {
+                formWindowClosing(evt);
+            }
+        });
 
         jTabbedPane1.setBackground(new java.awt.Color(0, 102, 255));
 
@@ -2104,6 +2109,10 @@ public class UI extends javax.swing.JFrame {
     private void filterBarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_filterBarActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_filterBarActionPerformed
+
+    private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
+        access.closeAll();
+    }//GEN-LAST:event_formWindowClosing
 private void handleLowStockUI(LowStockEvent event) {
     System.out.println("USED: ");
     System.out.println(event);

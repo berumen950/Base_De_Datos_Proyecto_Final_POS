@@ -21,7 +21,6 @@ import java.util.function.*;
 public class DAO {
     private final String dbURL;
     private final Map<String,Table> tables = new HashMap<>();
-    private PGConnection pgcon;
     private Connection con;
     private volatile boolean listen;
     public DAO(String dbURL){
@@ -33,7 +32,6 @@ public class DAO {
             Class.forName("org.postgresql.Driver");
             con = DriverManager.getConnection(dbURL,"admin","admin123");
             con.setAutoCommit(false);
-            pgcon = con.unwrap(PGConnection.class);
             Statement st=con.createStatement();
             ResultSet rs=st.executeQuery("SELECT dataSift()");
             
@@ -306,11 +304,26 @@ public class DAO {
         if(this.listen){
             return;
         }
+        try{
+            Class.forName("org.postgresql.Driver");
+        }
+        catch(Exception e){
+            System.out.println("Error: " + e.getMessage());
+        }
         Thread listenThread = new Thread(()->{
-                try(Statement st = con.createStatement()){
+                try(Connection listenCon = DriverManager.getConnection(dbURL,"admin","admin123");
+                    Statement st = listenCon.createStatement();
+                    ){
+                    listenCon.setAutoCommit(true);
+                    PGConnection pgcon = listenCon.unwrap(PGConnection.class);
                     st.execute("LISTEN low_stock_channel");
                     ObjectMapper mapper = new ObjectMapper();
                     while(listen){
+                        try(ResultSet rs = st.executeQuery("SELECT 1")){
+                           while(rs.next()){
+                               rs.getInt(1);
+                           }
+                        }
                         PGNotification[] notifications = pgcon.getNotifications();
 
                         if(notifications != null){
@@ -328,7 +341,12 @@ public class DAO {
                         Thread.sleep(1000);
                     }
                 }
-                catch(InterruptedException | SQLException | JsonProcessingException e){
+                catch(InterruptedException e){
+                    Thread.currentThread().interrupt();
+                    System.out.println("Error: " + e.getMessage());
+                    e.printStackTrace();
+                }
+                catch(SQLException | JsonProcessingException e){
                     System.out.println("Error: " + e.getMessage());
                     e.printStackTrace();
                 }
